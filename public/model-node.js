@@ -94,15 +94,6 @@ class ModelNode {
     if (labelInput) {
       labelInput.addEventListener('input', () => this.updateLabel(labelInput.value));
     }
-
-    const viewerBtn = document.getElementById('open-viewer-btn');
-    if (viewerBtn) {
-      viewerBtn.addEventListener('click', () => {
-        if (window._viewer3d) {
-          window._viewer3d.open(this.modelUrl, this.filename);
-        }
-      });
-    }
   }
 
   renderProperties() {
@@ -116,9 +107,6 @@ class ModelNode {
       <div class="prop-section">
         <label class="prop-section-label">Label</label>
         <input type="text" id="node-label" class="prop-input" value="${this.label}" placeholder="e.g. Character Model">
-      </div>
-      <div class="prop-section">
-        <button id="open-viewer-btn" class="generate-btn" style="background:#e94560">🎲 Open 3D Viewer</button>
       </div>
       <div class="prop-row">
         <span class="prop-label">Filename</span>

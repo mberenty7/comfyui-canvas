@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   addMenu.querySelector('[data-action="prompt"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addPromptNode(); });
   addMenu.querySelector('[data-action="workflow"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addWorkflowNode(); });
   addMenu.querySelector('[data-action="model"]').addEventListener('click', () => { addMenu.classList.add('hidden'); importModel(); });
+  addMenu.querySelector('[data-action="viewer"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addViewerNode(); });
   addMenu.querySelector('[data-action="generate"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addGenerateNode(); });
 
   document.getElementById('btn-save').addEventListener('click', saveCanvas);
@@ -34,13 +35,15 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   engine.onNodeDeselected = () => closeProperties();
 
-  // Double-click model node → open viewer
+  // Double-click viewer or model node → open viewer
   engine.fc.on('mouse:dblclick', (e) => {
     let obj = e.target;
     while (obj && !obj.nodeId && obj.group) obj = obj.group;
     if (!obj?.nodeId) return;
     const node = engine.nodes.get(obj.nodeId);
-    if (node?.type === 'model' && node.modelUrl) {
+    if (node?.type === 'viewer' && node.connectedModel) {
+      window._openViewerForNode(node.connectedModel.nodeId);
+    } else if (node?.type === 'model' && node.modelUrl) {
       window._viewer3d.open(node.modelUrl, node.filename);
     }
   });
@@ -50,6 +53,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 3D Viewer
   window._viewer3d = new Viewer3D();
+
+  // Callback for ViewerNode → open 3D viewer with model
+  window._openViewerForNode = (modelNodeId) => {
+    const modelNode = engine.nodes.get(modelNodeId);
+    if (modelNode?.type === 'model' && modelNode.modelUrl) {
+      window._viewer3d.open(modelNode.modelUrl, modelNode.filename);
+    }
+  };
 
   // Callback for viewer captures → ImageNode on canvas
   window._createImageNode = async (opts) => {
@@ -251,6 +262,11 @@ function handleConnect(sourceNode) {
     // Generate node → workflow
     targetNode.connectedWorkflow = { nodeId: sourceNode.id };
     connected = true;
+  } else if (mode.connectType === 'viewer-model' && sourceNode.type === 'model') {
+    // Viewer node → model input
+    targetNode.connectModel(sourceNode.id);
+    targetNode._updateStatus(sourceNode.filename || 'Model');
+    connected = true;
   } else if (mode.expects === 'prompt' && sourceNode.type === 'prompt') {
     // Workflow node → prompt input
     targetNode.connectInput(mode.inputName, sourceNode.id);
@@ -329,6 +345,7 @@ function openQuickAdd() {
       else if (action === 'prompt') addPromptNode();
       else if (action === 'workflow') addWorkflowNode();
       else if (action === 'model') importModel();
+      else if (action === 'viewer') addViewerNode();
       else if (action === 'generate') addGenerateNode();
     };
   });
@@ -448,6 +465,14 @@ async function addWorkflowNode() {
       engine.register(node);
     });
   });
+}
+
+function addViewerNode() {
+  const pos = engine.canvasCenter();
+  const id = engine.nextId();
+  const node = new ViewerNode(id);
+  node.createVisual(pos.x - 90, pos.y - 35);
+  engine.register(node);
 }
 
 function addGenerateNode() {

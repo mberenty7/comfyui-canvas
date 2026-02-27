@@ -248,6 +248,12 @@ class CanvasEngine {
         node.createVisual(n.x, n.y);
         this.register(node);
 
+      } else if (n.type === 'viewer') {
+        const node = new ViewerNode(n.id, { label: n.label });
+        if (n.connectedModel) node.connectedModel = n.connectedModel;
+        node.createVisual(n.x, n.y);
+        this.register(node);
+
       } else if (n.type === 'generate') {
         const node = new GenerateNode(n.id, {
           count: n.count, seedMode: n.seedMode, baseSeed: n.baseSeed, label: n.label,
