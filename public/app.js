@@ -176,29 +176,31 @@ function handleConnect(sourceNode) {
   const targetNode = engine.nodes.get(mode.targetNodeId);
   if (!targetNode) return;
 
-  if (mode.connectType === 'workflow') {
-    // Generate node connecting to a workflow
-    if (sourceNode.type === 'workflow') {
-      targetNode.connectedWorkflow = { nodeId: sourceNode.id };
-      engine.addConnection(sourceNode.id, targetNode.id);
-    }
-  } else if (mode.connectType === 'prompt') {
-    // Generate node connecting to a prompt
-    if (sourceNode.type === 'prompt') {
-      targetNode.connectedPrompt = { nodeId: sourceNode.id };
-      engine.addConnection(sourceNode.id, targetNode.id);
-    }
-  } else if (mode.inputName) {
-    // Workflow node connecting an image input
-    if (sourceNode.type === 'image') {
-      targetNode.connectInput(mode.inputName, sourceNode);
-      engine.addConnection(sourceNode.id, targetNode.id);
-    }
+  let connected = false;
+
+  if (mode.connectType === 'workflow' && sourceNode.type === 'workflow') {
+    // Generate node → workflow
+    targetNode.connectedWorkflow = { nodeId: sourceNode.id };
+    connected = true;
+  } else if (mode.expects === 'prompt' && sourceNode.type === 'prompt') {
+    // Workflow node → prompt input
+    targetNode.connectInput(mode.inputName, sourceNode.id);
+    connected = true;
+  } else if (mode.expects === 'image' && sourceNode.type === 'image') {
+    // Workflow node → image input
+    targetNode.connectInput(mode.inputName, sourceNode.id);
+    connected = true;
   }
 
-  // Refresh properties
-  showProperties(targetNode);
-  if (targetNode.bindProperties) targetNode.bindProperties();
+  if (connected) {
+    engine.addConnection(sourceNode.id, targetNode.id);
+    showProperties(targetNode);
+    if (targetNode.bindProperties) targetNode.bindProperties();
+  } else {
+    // Wrong type — cancel silently, refresh panel
+    showProperties(targetNode);
+    if (targetNode.bindProperties) targetNode.bindProperties();
+  }
 }
 
 // ── Keyboard ─────────────────────────────────

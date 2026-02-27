@@ -1,5 +1,5 @@
 // GenerateNode — executes a connected workflow N times with seed control
-// Input: a WorkflowNode
+// Input: a WorkflowNode (which already has its prompt/image connections)
 // Output: N Image nodes placed on canvas
 
 class GenerateNode {
@@ -11,9 +11,7 @@ class GenerateNode {
     this.baseSeed = baseSeed || Math.floor(Math.random() * 999999);
     this.label = label || '';
     this.connectedWorkflow = null; // { nodeId }
-    this.connectedPrompt = null;   // { nodeId }
     this.isRunning = false;
-    this.progress = { current: 0, total: 0, step: 0, maxStep: 0 };
     this.fabricObject = null;
   }
 
@@ -119,22 +117,15 @@ class GenerateNode {
     const seeds = [];
     for (let i = 0; i < this.count; i++) {
       switch (this.seedMode) {
-        case 'increment':
-          seeds.push(this.baseSeed + i);
-          break;
-        case 'random':
-          seeds.push(Math.floor(Math.random() * 999999));
-          break;
-        case 'fixed':
-          seeds.push(this.baseSeed);
-          break;
+        case 'increment': seeds.push(this.baseSeed + i); break;
+        case 'random': seeds.push(Math.floor(Math.random() * 999999)); break;
+        case 'fixed': seeds.push(this.baseSeed); break;
       }
     }
     return seeds;
   }
 
-  // Run generation — called from app.js
-  // Returns array of { imageUrl, comfyName, seed }
+  // Run generation — returns array of { imageUrl, comfyName, seed }
   async run(engine) {
     if (this.isRunning) return [];
     if (!this.connectedWorkflow) throw new Error('No workflow connected');
@@ -142,42 +133,36 @@ class GenerateNode {
     const workflowNode = engine.nodes.get(this.connectedWorkflow.nodeId);
     if (!workflowNode || workflowNode.type !== 'workflow') throw new Error('Connected node is not a workflow');
 
-    // If there's a connected prompt, apply it to the workflow
-    if (this.connectedPrompt) {
-      const promptNode = engine.nodes.get(this.connectedPrompt.nodeId);
-      if (promptNode && promptNode.type === 'prompt') {
-        workflowNode.applyPrompt(promptNode);
-      }
-    }
-
     this.isRunning = true;
     this.setBorderState('running');
     const seeds = this.getSeeds();
     const results = [];
 
     for (let i = 0; i < seeds.length; i++) {
-      this.setStatus(`Generating ${i + 1}/${seeds.length}...`);
-      this.progress = { current: i + 1, total: seeds.length, step: 0, maxStep: 0 };
+      this.setStatus(`${i + 1}/${seeds.length}...`);
 
       try {
-        // Set seed in workflow
+        // Override seed in workflow params
         const seedParam = workflowNode.templateParams.find(p => p.type === 'seed');
         if (seedParam) {
           workflowNode.paramValues[seedParam.name] = seeds[i];
         }
 
-        const workflow = workflowNode.buildWorkflow();
+        // Build workflow with all connections resolved
+        const workflow = workflowNode.buildWorkflow(engine);
 
-        // Submit
+        // Submit to ComfyUI
         const resp = await fetch('/api/comfy/prompt', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ workflow }),
         });
-        const { prompt_id } = await resp.json();
+        const data = await resp.json();
+
+        if (data.error) throw new Error(data.error);
 
         // Poll for result
-        const result = await this._pollResult(prompt_id);
+        const result = await this._pollResult(data.prompt_id);
         if (result) {
           const outputs = result.outputs || {};
           for (const nodeKey of Object.keys(outputs)) {
@@ -192,7 +177,8 @@ class GenerateNode {
         }
       } catch (err) {
         console.error(`Generation ${i + 1} failed:`, err);
-        this.setStatus(`Error on ${i + 1}/${seeds.length}`);
+        this.setStatus(`Error: ${err.message}`);
+        this.setBorderState('error');
       }
     }
 
@@ -203,7 +189,7 @@ class GenerateNode {
   }
 
   async _pollResult(promptId) {
-    const maxWait = 300000; // 5 min
+    const maxWait = 300000;
     const start = Date.now();
     while (Date.now() - start < maxWait) {
       const resp = await fetch(`/api/comfy/history/${promptId}`);
@@ -215,8 +201,7 @@ class GenerateNode {
   }
 
   renderProperties() {
-    const workflowStatus = this.connectedWorkflow ? '✅ Connected' : '⬜ Click to connect';
-    const promptStatus = this.connectedPrompt ? '✅ Connected' : '⬜ Click to connect (optional)';
+    const workflowStatus = this.connectedWorkflow ? '✅ Connected' : 'Click to connect a workflow node';
 
     return `
       <div class="prop-section">
@@ -224,15 +209,9 @@ class GenerateNode {
         <input type="text" id="node-label" class="prop-input" value="${this.label}" placeholder="e.g. Batch Run">
       </div>
       <div class="prop-section">
-        <label class="prop-section-label">Workflow Input</label>
+        <label class="prop-section-label">⚙️ Workflow</label>
         <div class="workflow-input-slot" data-connect="workflow" style="cursor:pointer">
           ${workflowStatus}
-        </div>
-      </div>
-      <div class="prop-section">
-        <label class="prop-section-label">Prompt Input (optional)</label>
-        <div class="workflow-input-slot" data-connect="prompt" style="cursor:pointer">
-          ${promptStatus}
         </div>
       </div>
       <div class="prop-section">
@@ -244,7 +223,7 @@ class GenerateNode {
         <select id="gen-seed-mode" class="prop-input">
           <option value="increment" ${this.seedMode === 'increment' ? 'selected' : ''}>Increment (seed, seed+1, seed+2...)</option>
           <option value="random" ${this.seedMode === 'random' ? 'selected' : ''}>Random each</option>
-          <option value="fixed" ${this.seedMode === 'fixed' ? 'selected' : ''}>Fixed (same seed every time)</option>
+          <option value="fixed" ${this.seedMode === 'fixed' ? 'selected' : ''}>Fixed (same seed)</option>
         </select>
       </div>
       <div class="prop-section">
@@ -280,15 +259,10 @@ class GenerateNode {
       if (seedInput) seedInput.value = this.baseSeed;
     });
 
-    // Connect slots
+    // Connect workflow slot
     document.querySelector('[data-connect="workflow"]')?.addEventListener('click', () => {
-      window._connectMode = { targetNodeId: this.id, connectType: 'workflow' };
+      window._connectMode = { targetNodeId: this.id, connectType: 'workflow', expects: 'workflow' };
       document.querySelector('[data-connect="workflow"]').textContent = '🔗 Click a workflow node...';
-    });
-
-    document.querySelector('[data-connect="prompt"]')?.addEventListener('click', () => {
-      window._connectMode = { targetNodeId: this.id, connectType: 'prompt' };
-      document.querySelector('[data-connect="prompt"]').textContent = '🔗 Click a prompt node...';
     });
 
     // Generate button
@@ -306,7 +280,6 @@ class GenerateNode {
       baseSeed: this.baseSeed,
       label: this.label,
       connectedWorkflow: this.connectedWorkflow,
-      connectedPrompt: this.connectedPrompt,
       x: this.fabricObject?.left || 0,
       y: this.fabricObject?.top || 0,
     };

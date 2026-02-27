@@ -2,24 +2,16 @@
   "name": "Text to Image",
   "description": "Generate an image from a text prompt",
   "color": "#4a9eff",
-  "inputs": [],
+  "inputs": [
+    {
+      "name": "prompt",
+      "type": "prompt",
+      "label": "Prompt",
+      "target_positive": { "node": "2", "field": "text" },
+      "target_negative": { "node": "3", "field": "text" }
+    }
+  ],
   "params": [
-    {
-      "name": "positive",
-      "label": "Positive Prompt",
-      "type": "prompt",
-      "target_node": "2",
-      "target_field": "text",
-      "default": ""
-    },
-    {
-      "name": "negative",
-      "label": "Negative Prompt",
-      "type": "prompt",
-      "target_node": "3",
-      "target_field": "text",
-      "default": "blurry, low quality, watermark, text"
-    },
     {
       "name": "seed",
       "label": "Seed",

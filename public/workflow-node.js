@@ -1,5 +1,5 @@
 // WorkflowNode — selects a ComfyUI template and configures params
-// Has input ports (image, prompt) and an output port for Generate to consume
+// Inputs (prompt, image) come from connected nodes — not from this node's properties
 
 class WorkflowNode {
   constructor(id, { templateId, templateName, templateColor, inputs, params, workflow, label } = {}) {
@@ -8,15 +8,15 @@ class WorkflowNode {
     this.templateId = templateId || '';
     this.templateName = templateName || 'Workflow';
     this.templateColor = templateColor || '#4a9eff';
-    this.templateInputs = inputs || [];
+    this.templateInputs = inputs || [];  // from config.json
     this.templateParams = params || [];
     this.workflow = workflow || {};
     this.label = label || '';
     this.paramValues = {};
-    this.connectedInputs = {}; // inputName → { nodeId, imageUrl, comfyName }
+    this.connectedInputs = {}; // inputName → { nodeId }
     this.fabricObject = null;
 
-    // Set defaults
+    // Set param defaults
     for (const p of this.templateParams) {
       this.paramValues[p.name] = p.default !== undefined ? p.default : '';
     }
@@ -54,14 +54,15 @@ class WorkflowNode {
     const ports = [];
     this.templateInputs.forEach((input, i) => {
       const py = 28 + i * 20;
+      const color = input.type === 'prompt' ? '#a855f7' : '#4a9eff';
       const dot = new fabric.Circle({
         radius: 5,
-        fill: '#4a9eff',
+        fill: color,
         stroke: '#fff',
         strokeWidth: 1.5,
         left: -5, top: py,
       });
-      const lbl = new fabric.Text(input.name, {
+      const lbl = new fabric.Text(input.label || input.name, {
         fontSize: 9,
         fill: '#666',
         fontFamily: 'monospace',
@@ -95,24 +96,17 @@ class WorkflowNode {
   updateLabel(text) {
     this.label = text;
     if (this.fabricObject) {
-      const labelObj = this.fabricObject._objects[2]; // userLabel
-      if (labelObj) {
-        labelObj.set('text', text);
-        this.fabricObject.canvas?.renderAll();
-      }
+      const labelObj = this.fabricObject._objects[2];
+      if (labelObj) { labelObj.set('text', text); this.fabricObject.canvas?.renderAll(); }
     }
   }
 
-  connectInput(inputName, sourceNode) {
-    this.connectedInputs[inputName] = {
-      nodeId: sourceNode.id,
-      imageUrl: sourceNode.imageUrl,
-      comfyName: sourceNode.comfyName,
-    };
+  connectInput(inputName, sourceNodeId) {
+    this.connectedInputs[inputName] = { nodeId: sourceNodeId };
   }
 
-  // Build the final ComfyUI workflow with all params and inputs applied
-  buildWorkflow() {
+  // Build the final ComfyUI workflow with all params and connected inputs applied
+  buildWorkflow(engine) {
     const wf = JSON.parse(JSON.stringify(this.workflow));
 
     // Apply params
@@ -128,30 +122,34 @@ class WorkflowNode {
       }
     }
 
-    // Apply connected image inputs
+    // Apply connected inputs
     for (const input of this.templateInputs) {
       const conn = this.connectedInputs[input.name];
-      if (conn?.comfyName && input.target_node) {
-        const node = wf[input.target_node];
-        if (node) {
-          node.inputs[input.target_field || 'image'] = conn.comfyName;
+      if (!conn) continue;
+
+      const sourceNode = engine.nodes.get(conn.nodeId);
+      if (!sourceNode) continue;
+
+      if (input.type === 'prompt' && sourceNode.type === 'prompt') {
+        // Wire positive and negative prompt text into the workflow
+        if (input.target_positive) {
+          const node = wf[input.target_positive.node];
+          if (node) node.inputs[input.target_positive.field] = sourceNode.positive || '';
+        }
+        if (input.target_negative) {
+          const node = wf[input.target_negative.node];
+          if (node) node.inputs[input.target_negative.field] = sourceNode.negative || '';
+        }
+      } else if (input.type === 'image' && sourceNode.type === 'image') {
+        // Wire image filename into the workflow
+        if (input.target_node) {
+          const node = wf[input.target_node];
+          if (node) node.inputs[input.target_field || 'image'] = sourceNode.comfyName;
         }
       }
     }
 
     return wf;
-  }
-
-  // Apply prompt from a connected PromptNode
-  applyPrompt(promptNode) {
-    for (const p of this.templateParams) {
-      if (p.name === 'positive' && promptNode.positive) {
-        this.paramValues.positive = promptNode.positive;
-      }
-      if (p.name === 'negative' && promptNode.negative) {
-        this.paramValues.negative = promptNode.negative;
-      }
-    }
   }
 
   renderProperties() {
@@ -162,36 +160,31 @@ class WorkflowNode {
       </div>
       <div class="prop-section">
         <label class="prop-section-label">Template</label>
-        <div class="prop-value" style="padding:4px 0">${this.templateName}</div>
+        <div class="prop-value" style="padding:4px 0;color:${this.templateColor}">${this.templateName}</div>
       </div>
     `;
 
     // Connected inputs
     for (const input of this.templateInputs) {
       const conn = this.connectedInputs[input.name];
+      const icon = input.type === 'prompt' ? '✏️' : '📷';
+      const expectedType = input.type === 'prompt' ? 'prompt' : 'image';
       html += `
         <div class="prop-section">
-          <label class="prop-section-label">${input.label || input.name}</label>
-          <div class="workflow-input-slot" data-input="${input.name}">
-            ${conn ? `✅ Connected (${conn.comfyName})` : '⬜ Click to connect an image node'}
+          <label class="prop-section-label">${icon} ${input.label || input.name}</label>
+          <div class="workflow-input-slot" data-input="${input.name}" data-expects="${expectedType}">
+            ${conn ? `✅ Connected` : `Click to connect a ${input.type} node`}
           </div>
         </div>
       `;
     }
 
-    // Params
+    // Params (no prompt types — those come from connections now)
     for (const p of this.templateParams) {
       if (p.type === 'hidden') continue;
       const value = this.paramValues[p.name];
 
-      if (p.type === 'prompt' || p.type === 'textarea') {
-        html += `
-          <div class="prop-section">
-            <label class="prop-section-label">${p.label || p.name}</label>
-            <textarea data-param="${p.name}" class="prop-textarea" rows="3">${value || ''}</textarea>
-          </div>
-        `;
-      } else if (p.type === 'slider' || p.type === 'range') {
+      if (p.type === 'slider' || p.type === 'range') {
         html += `
           <div class="prop-section">
             <label class="prop-section-label">${p.label || p.name}</label>
@@ -234,9 +227,7 @@ class WorkflowNode {
 
   bindProperties() {
     const labelInput = document.getElementById('node-label');
-    if (labelInput) {
-      labelInput.addEventListener('input', () => this.updateLabel(labelInput.value));
-    }
+    if (labelInput) labelInput.addEventListener('input', () => this.updateLabel(labelInput.value));
 
     // Param listeners
     document.querySelectorAll('[data-param]').forEach(el => {
@@ -255,8 +246,9 @@ class WorkflowNode {
       el.style.cursor = 'pointer';
       el.addEventListener('click', () => {
         const inputName = el.dataset.input;
-        window._connectMode = { targetNodeId: this.id, inputName };
-        el.textContent = '🔗 Click an image node on the canvas...';
+        const expects = el.dataset.expects;
+        window._connectMode = { targetNodeId: this.id, inputName, expects };
+        el.textContent = `🔗 Click a ${expects} node on the canvas...`;
       });
     });
   }

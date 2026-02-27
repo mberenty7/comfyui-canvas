@@ -4,29 +4,21 @@
   "color": "#ff9800",
   "inputs": [
     {
+      "name": "prompt",
+      "type": "prompt",
+      "label": "Prompt",
+      "target_positive": { "node": "2", "field": "text" },
+      "target_negative": { "node": "3", "field": "text" }
+    },
+    {
       "name": "image",
+      "type": "image",
       "label": "Source Image",
       "target_node": "4",
       "target_field": "image"
     }
   ],
   "params": [
-    {
-      "name": "positive",
-      "label": "Positive Prompt",
-      "type": "prompt",
-      "target_node": "2",
-      "target_field": "text",
-      "default": ""
-    },
-    {
-      "name": "negative",
-      "label": "Negative Prompt",
-      "type": "prompt",
-      "target_node": "3",
-      "target_field": "text",
-      "default": "blurry, low quality, watermark, text"
-    },
     {
       "name": "seed",
       "label": "Seed",
