@@ -239,6 +239,15 @@ class CanvasEngine {
         node.createVisual(n.x, n.y);
         this.register(node);
 
+      } else if (n.type === 'model') {
+        const node = new ModelNode(n.id, {
+          modelUrl: n.modelUrl, filename: n.filename,
+          comfyName: n.comfyName, format: n.format,
+          fileSize: n.fileSize, label: n.label,
+        });
+        node.createVisual(n.x, n.y);
+        this.register(node);
+
       } else if (n.type === 'generate') {
         const node = new GenerateNode(n.id, {
           count: n.count, seedMode: n.seedMode, baseSeed: n.baseSeed, label: n.label,

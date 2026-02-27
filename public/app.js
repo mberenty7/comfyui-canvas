@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
   addMenu.querySelector('[data-action="image"]').addEventListener('click', () => { addMenu.classList.add('hidden'); importImage(); });
   addMenu.querySelector('[data-action="prompt"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addPromptNode(); });
   addMenu.querySelector('[data-action="workflow"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addWorkflowNode(); });
+  addMenu.querySelector('[data-action="model"]').addEventListener('click', () => { addMenu.classList.add('hidden'); importModel(); });
   addMenu.querySelector('[data-action="generate"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addGenerateNode(); });
 
   document.getElementById('btn-save').addEventListener('click', saveCanvas);
@@ -33,8 +34,31 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   engine.onNodeDeselected = () => closeProperties();
 
+  // Double-click model node → open viewer
+  engine.fc.on('mouse:dblclick', (e) => {
+    let obj = e.target;
+    while (obj && !obj.nodeId && obj.group) obj = obj.group;
+    if (!obj?.nodeId) return;
+    const node = engine.nodes.get(obj.nodeId);
+    if (node?.type === 'model' && node.modelUrl) {
+      window._viewer3d.open(node.modelUrl, node.filename);
+    }
+  });
+
   // Generate callback
   window._onGenerate = runGenerate;
+
+  // 3D Viewer
+  window._viewer3d = new Viewer3D();
+
+  // Callback for viewer captures → ImageNode on canvas
+  window._createImageNode = async (opts) => {
+    const pos = engine.canvasCenter();
+    const id = engine.nextId();
+    const node = new ImageNode(id, opts);
+    await node.createVisual(pos.x - 100, pos.y - 100);
+    engine.register(node);
+  };
 
   setupDragDrop();
   setupContextMenu();
@@ -110,10 +134,15 @@ function setupDragDrop() {
   });
 
   document.body.addEventListener('drop', (e) => {
+    // Don't intercept drops on the 3D viewer
+    if (e.target.closest('.viewer3d-viewport')) return;
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file?.type.startsWith('image/')) {
+    if (!file) return;
+    if (file.type.startsWith('image/')) {
       uploadAndPlace(file, e.clientX, e.clientY);
+    } else if (/\.(glb|gltf|obj|fbx)$/i.test(file.name)) {
+      uploadAndPlaceModel(file, e.clientX, e.clientY);
     }
   });
 }
@@ -156,6 +185,43 @@ function getImageDimensions(url) {
   });
 }
 
+// ── Import 3D Model ──────────────────────────
+
+function importModel() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.glb,.gltf,.obj,.fbx';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) uploadAndPlaceModel(file);
+  };
+  input.click();
+}
+
+async function uploadAndPlaceModel(file, screenX, screenY) {
+  const formData = new FormData();
+  formData.append('model', file);
+
+  const resp = await fetch('/api/models/upload', { method: 'POST', body: formData });
+  const result = await resp.json();
+
+  const pos = screenX !== undefined
+    ? engine.screenToCanvas(screenX, screenY)
+    : engine.canvasCenter();
+
+  const ext = file.name.split('.').pop().toUpperCase();
+  const id = engine.nextId();
+  const node = new ModelNode(id, {
+    modelUrl: result.path,
+    filename: result.originalName || file.name,
+    format: ext,
+    fileSize: file.size,
+  });
+
+  node.createVisual(pos.x - 100, pos.y - 35);
+  engine.register(node);
+}
+
 // ── Properties Panel ─────────────────────────
 
 function showProperties(node) {
@@ -189,8 +255,8 @@ function handleConnect(sourceNode) {
     // Workflow node → prompt input
     targetNode.connectInput(mode.inputName, sourceNode.id);
     connected = true;
-  } else if (mode.expects === 'image' && sourceNode.type === 'image') {
-    // Workflow node → image input
+  } else if (mode.expects === 'image' && (sourceNode.type === 'image' || sourceNode.type === 'model')) {
+    // Workflow node → image input (images or 3D model captures)
     targetNode.connectInput(mode.inputName, sourceNode.id);
     connected = true;
   }
@@ -262,6 +328,7 @@ function openQuickAdd() {
       if (action === 'image') importImage();
       else if (action === 'prompt') addPromptNode();
       else if (action === 'workflow') addWorkflowNode();
+      else if (action === 'model') importModel();
       else if (action === 'generate') addGenerateNode();
     };
   });

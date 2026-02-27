@@ -28,9 +28,13 @@ function saveConfig(config) {
 
 let config = loadConfig();
 
+const MODELS_DIR = path.join(__dirname, 'models');
+fs.mkdirSync(MODELS_DIR, { recursive: true });
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static('public'));
 app.use('/uploads', express.static(UPLOAD_DIR));
+app.use('/models', express.static(MODELS_DIR));
 
 const upload = multer({ dest: UPLOAD_DIR });
 
@@ -86,6 +90,25 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
       originalName: file.originalname,
       path: `/uploads/${path.basename(newPath)}`,
       comfyName: path.basename(newPath),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── 3D Model Upload ─────────────────────────
+
+app.post('/api/models/upload', upload.single('model'), (req, res) => {
+  try {
+    const file = req.file;
+    const ext = path.extname(file.originalname) || '.glb';
+    const safeName = file.filename + ext;
+    const newPath = path.join(MODELS_DIR, safeName);
+    fs.renameSync(file.path, newPath);
+    res.json({
+      filename: safeName,
+      originalName: file.originalname,
+      path: `/models/${safeName}`,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

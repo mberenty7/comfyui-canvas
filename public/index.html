@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ComfyUI Canvas</title>
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 </head>
 <body>
@@ -16,6 +16,7 @@
           <div class="dropdown-item" data-action="image">📷 Image</div>
           <div class="dropdown-item" data-action="prompt">✏️ Prompt</div>
           <div class="dropdown-item" data-action="workflow">⚙️ Workflow</div>
+          <div class="dropdown-item" data-action="model">🎲 3D Model</div>
           <div class="dropdown-item" data-action="generate">▶ Generate</div>
         </div>
       </div>
@@ -47,6 +48,7 @@
       <div class="quick-add-item" data-action="image">📷 Image</div>
       <div class="quick-add-item" data-action="prompt">✏️ Prompt</div>
       <div class="quick-add-item" data-action="workflow">⚙️ Workflow</div>
+      <div class="quick-add-item" data-action="model">🎲 3D Model</div>
       <div class="quick-add-item" data-action="generate">▶ Generate</div>
     </div>
   </div>
@@ -85,11 +87,13 @@
     </div>
   </div>
 
-  <script src="canvas-engine.js?v=7"></script>
-  <script src="image-node.js?v=7"></script>
-  <script src="prompt-node.js?v=7"></script>
-  <script src="workflow-node.js?v=7"></script>
-  <script src="generate-node.js?v=7"></script>
-  <script src="app.js?v=7"></script>
+  <script src="canvas-engine.js?v=8"></script>
+  <script src="image-node.js?v=8"></script>
+  <script src="prompt-node.js?v=8"></script>
+  <script src="workflow-node.js?v=8"></script>
+  <script src="generate-node.js?v=8"></script>
+  <script src="model-node.js?v=8"></script>
+  <script src="viewer-3d.js?v=8"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
