@@ -5,73 +5,86 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ComfyUI Canvas</title>
   <link rel="stylesheet" href="style.css">
-  <!-- fabric.js for canvas engine -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 </head>
 <body>
-  <!-- Top toolbar -->
   <div id="toolbar">
     <div class="toolbar-group">
-      <button id="btn-add-image" title="Import Image">📷 Import</button>
-      <button id="btn-add-node" title="Add Workflow Node">➕ Add Node</button>
-      <button id="btn-zoom-fit" title="Zoom to Fit">🔲 Fit</button>
-      <button id="btn-zoom-reset" title="Reset Zoom">1:1</button>
-    </div>
-    <div class="toolbar-group">
+      <div class="dropdown">
+        <button id="btn-add-node">➕ Add Node</button>
+        <div class="dropdown-menu hidden" id="add-node-menu">
+          <div class="dropdown-item" data-action="image">📷 Image</div>
+          <div class="dropdown-item" data-action="prompt">✏️ Prompt</div>
+          <div class="dropdown-item" data-action="workflow">⚙️ Workflow</div>
+          <div class="dropdown-item" data-action="generate">▶ Generate</div>
+        </div>
+      </div>
       <button id="btn-save" title="Save Canvas">💾 Save</button>
       <button id="btn-load" title="Load Canvas">📂 Load</button>
+      <button id="btn-settings" title="Settings">⚙️</button>
     </div>
     <div class="toolbar-group status">
+      <span id="comfy-status" class="status-dot disconnected" title="ComfyUI status">●</span>
       <span id="zoom-level">100%</span>
-      <span id="status-text">Ready</span>
     </div>
   </div>
 
-  <!-- Main canvas area -->
   <canvas id="canvas"></canvas>
 
-  <!-- Node template picker modal -->
-  <div id="template-modal" class="modal hidden">
-    <div class="modal-content">
-      <h3>Add Workflow Node</h3>
-      <div id="template-list"></div>
-      <button class="modal-close" onclick="document.getElementById('template-modal').classList.add('hidden')">Cancel</button>
+  <!-- Properties panel -->
+  <div id="properties" class="hidden">
+    <div id="properties-header">
+      <h3>Properties</h3>
+      <button id="properties-close">✕</button>
+    </div>
+    <div id="properties-body"></div>
+  </div>
+
+  <!-- Quick add popup -->
+  <div id="quick-add" class="hidden">
+    <input type="text" id="quick-add-search" placeholder="Search nodes..." autocomplete="off">
+    <div id="quick-add-list">
+      <div class="quick-add-item" data-action="image">📷 Image</div>
+      <div class="quick-add-item" data-action="prompt">✏️ Prompt</div>
+      <div class="quick-add-item" data-action="workflow">⚙️ Workflow</div>
+      <div class="quick-add-item" data-action="generate">▶ Generate</div>
     </div>
   </div>
 
-  <!-- Right panel for node settings -->
-  <div id="settings-panel" class="hidden">
-    <div id="settings-header">
-      <h3 id="settings-title">Node Settings</h3>
-      <button id="settings-close">✕</button>
-    </div>
-    <div id="settings-body"></div>
-    <div id="settings-footer">
-      <button id="btn-generate" class="btn-primary">▶ Generate</button>
-    </div>
+  <!-- Context menu -->
+  <div id="context-menu" class="hidden">
+    <div class="ctx-item" data-action="delete">🗑 Delete Node</div>
   </div>
 
-  <!-- Save/Load modal -->
-  <div id="save-modal" class="modal hidden">
+  <!-- Settings modal -->
+  <div id="settings-modal" class="modal hidden">
     <div class="modal-content">
-      <h3 id="save-modal-title">Save Canvas</h3>
-      <input type="text" id="canvas-name" placeholder="Canvas name...">
-      <div id="canvas-list"></div>
+      <h3>Settings</h3>
+      <div class="prop-section">
+        <label class="prop-section-label">ComfyUI URL</label>
+        <input type="text" id="settings-comfy-url" class="prop-input" placeholder="http://localhost:8188">
+      </div>
       <div class="modal-actions">
-        <button id="btn-save-confirm" class="btn-primary">Save</button>
-        <button class="modal-close" onclick="document.getElementById('save-modal').classList.add('hidden')">Cancel</button>
+        <button id="settings-save" class="generate-btn">Save</button>
+        <button id="settings-cancel" class="prop-btn">Cancel</button>
       </div>
     </div>
   </div>
 
-  <!-- Progress overlay -->
-  <div id="progress-overlay" class="hidden">
-    <div id="progress-bar"><div id="progress-fill"></div></div>
-    <span id="progress-text">Generating...</span>
+  <!-- Workflow template picker modal -->
+  <div id="workflow-picker" class="modal hidden">
+    <div class="modal-content">
+      <h3>Choose Workflow</h3>
+      <div id="workflow-picker-list"></div>
+      <button id="workflow-picker-cancel" class="prop-btn" style="margin-top:12px;width:100%">Cancel</button>
+    </div>
   </div>
 
   <script src="canvas-engine.js"></script>
-  <script src="workflow-nodes.js"></script>
+  <script src="image-node.js"></script>
+  <script src="prompt-node.js"></script>
+  <script src="workflow-node.js"></script>
+  <script src="generate-node.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

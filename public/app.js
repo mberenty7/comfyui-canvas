@@ -1,331 +1,448 @@
-// Main App — ties canvas engine, UI, and ComfyUI together
+// App — ties it all together
 
 let engine;
-let ws;
 
 document.addEventListener('DOMContentLoaded', () => {
   engine = new CanvasEngine('canvas');
 
-  // Wire up toolbar
-  document.getElementById('btn-add-image').addEventListener('click', importImage);
-  document.getElementById('btn-add-node').addEventListener('click', showTemplateModal);
-  document.getElementById('btn-zoom-fit').addEventListener('click', () => engine.zoomToFit());
-  document.getElementById('btn-zoom-reset').addEventListener('click', () => engine.resetZoom());
-  document.getElementById('btn-save').addEventListener('click', showSaveModal);
-  document.getElementById('btn-load').addEventListener('click', showLoadModal);
-  document.getElementById('settings-close').addEventListener('click', closeSettings);
-  document.getElementById('btn-generate').addEventListener('click', generateCurrent);
+  // Add Node dropdown
+  const addBtn = document.getElementById('btn-add-node');
+  const addMenu = document.getElementById('add-node-menu');
+  addBtn.addEventListener('click', () => addMenu.classList.toggle('hidden'));
+  document.addEventListener('click', (e) => {
+    if (!addBtn.contains(e.target) && !addMenu.contains(e.target)) addMenu.classList.add('hidden');
+  });
+  addMenu.querySelector('[data-action="image"]').addEventListener('click', () => { addMenu.classList.add('hidden'); importImage(); });
+  addMenu.querySelector('[data-action="prompt"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addPromptNode(); });
+  addMenu.querySelector('[data-action="workflow"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addWorkflowNode(); });
+  addMenu.querySelector('[data-action="generate"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addGenerateNode(); });
 
-  // Node selection callbacks
+  document.getElementById('btn-save').addEventListener('click', saveCanvas);
+  document.getElementById('btn-load').addEventListener('click', loadCanvas);
+  document.getElementById('btn-settings').addEventListener('click', openSettings);
+  document.getElementById('properties-close').addEventListener('click', closeProperties);
+
   engine.onNodeSelected = (node) => {
-    if (node.type === 'workflow') {
-      showSettings(node);
+    // If in connect mode, handle the connection
+    if (window._connectMode) {
+      handleConnect(node);
+      return;
     }
+    showProperties(node);
+    if (node.bindProperties) node.bindProperties();
   };
-  engine.onNodeDeselected = () => closeSettings();
+  engine.onNodeDeselected = () => closeProperties();
 
-  // Connect WebSocket for progress
-  connectWS();
+  // Generate callback
+  window._onGenerate = runGenerate;
 
-  // Drag and drop images onto canvas
   setupDragDrop();
+  setupContextMenu();
+  setupKeyboard();
+  checkComfyStatus();
 
-  setStatus('Ready — Alt+drag to pan, scroll to zoom');
+  // Poll ComfyUI status every 30s
+  setInterval(checkComfyStatus, 30000);
 });
 
-// ── Image Import ─────────────────────────────
+// ── ComfyUI Status ───────────────────────────
+
+async function checkComfyStatus() {
+  const dot = document.getElementById('comfy-status');
+  try {
+    const resp = await fetch('/api/comfy/status');
+    const data = await resp.json();
+    dot.classList.toggle('connected', data.connected);
+    dot.classList.toggle('disconnected', !data.connected);
+    dot.title = data.connected ? 'ComfyUI connected' : 'ComfyUI disconnected';
+  } catch {
+    dot.classList.add('disconnected');
+    dot.classList.remove('connected');
+    dot.title = 'ComfyUI disconnected';
+  }
+}
+
+// ── Settings ─────────────────────────────────
+
+async function openSettings() {
+  const modal = document.getElementById('settings-modal');
+  const urlInput = document.getElementById('settings-comfy-url');
+
+  const resp = await fetch('/api/config');
+  const config = await resp.json();
+  urlInput.value = config.comfyUrl || '';
+
+  modal.classList.remove('hidden');
+
+  document.getElementById('settings-save').onclick = async () => {
+    await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comfyUrl: urlInput.value }),
+    });
+    modal.classList.add('hidden');
+    checkComfyStatus();
+  };
+
+  document.getElementById('settings-cancel').onclick = () => modal.classList.add('hidden');
+}
+
+// ── Import Image ─────────────────────────────
 
 function importImage() {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
-  input.onchange = async (e) => {
+  input.onchange = (e) => {
     const file = e.target.files[0];
-    if (!file) return;
-
-    setStatus('Uploading image...');
-    const formData = new FormData();
-    formData.append('image', file);
-
-    const resp = await fetch('/api/upload', { method: 'POST', body: formData });
-    const result = await resp.json();
-
-    // Add to canvas at center
-    const vpt = engine.fabricCanvas.viewportTransform;
-    const cx = (engine.fabricCanvas.getWidth() / 2 - vpt[4]) / engine.fabricCanvas.getZoom();
-    const cy = (engine.fabricCanvas.getHeight() / 2 - vpt[5]) / engine.fabricCanvas.getZoom();
-
-    await engine.addImageNode(result.path, result.comfyName, cx - 100, cy - 100);
-    setStatus(`Imported: ${file.name}`);
+    if (file) uploadAndPlace(file);
   };
   input.click();
 }
 
 function setupDragDrop() {
-  const canvasEl = document.querySelector('.canvas-container') || document.getElementById('canvas');
-
   document.body.addEventListener('dragover', (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
   });
 
-  document.body.addEventListener('drop', async (e) => {
+  document.body.addEventListener('drop', (e) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (!file || !file.type.startsWith('image/')) return;
-
-    setStatus('Uploading dropped image...');
-    const formData = new FormData();
-    formData.append('image', file);
-
-    const resp = await fetch('/api/upload', { method: 'POST', body: formData });
-    const result = await resp.json();
-
-    const zoom = engine.fabricCanvas.getZoom();
-    const vpt = engine.fabricCanvas.viewportTransform;
-    const x = (e.clientX - vpt[4]) / zoom;
-    const y = (e.clientY - 48 - vpt[5]) / zoom;
-
-    await engine.addImageNode(result.path, result.comfyName, x, y);
-    setStatus(`Imported: ${file.name}`);
+    if (file?.type.startsWith('image/')) {
+      uploadAndPlace(file, e.clientX, e.clientY);
+    }
   });
 }
 
-// ── Template Modal ───────────────────────────
+async function uploadAndPlace(file, screenX, screenY) {
+  const formData = new FormData();
+  formData.append('image', file);
 
-async function showTemplateModal() {
-  const modal = document.getElementById('template-modal');
-  const list = document.getElementById('template-list');
+  // Upload to both local and ComfyUI
+  const resp = await fetch('/api/comfy/upload', { method: 'POST', body: formData });
+  const result = await resp.json();
 
-  list.innerHTML = '<p style="color:#888">Loading templates...</p>';
-  modal.classList.remove('hidden');
+  const dims = await getImageDimensions(result.localPath);
 
+  const pos = screenX !== undefined
+    ? engine.screenToCanvas(screenX, screenY)
+    : engine.canvasCenter();
+
+  const id = engine.nextId();
+  const node = new ImageNode(id, {
+    imageUrl: result.localPath,
+    filename: result.originalName || file.name,
+    comfyName: result.comfyName,
+    width: dims.width,
+    height: dims.height,
+    fileSize: file.size,
+    format: file.type.split('/')[1]?.toUpperCase() || '?',
+  });
+
+  await node.createVisual(pos.x - 100, pos.y - 100);
+  engine.register(node);
+}
+
+function getImageDimensions(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => resolve({ width: 0, height: 0 });
+    img.src = url;
+  });
+}
+
+// ── Properties Panel ─────────────────────────
+
+function showProperties(node) {
+  if (!node?.renderProperties) return;
+  document.getElementById('properties-body').innerHTML = node.renderProperties();
+  document.getElementById('properties').classList.remove('hidden');
+}
+
+function closeProperties() {
+  document.getElementById('properties').classList.add('hidden');
+}
+
+// ── Connection System ────────────────────────
+
+function handleConnect(sourceNode) {
+  const mode = window._connectMode;
+  window._connectMode = null;
+
+  if (!mode) return;
+
+  const targetNode = engine.nodes.get(mode.targetNodeId);
+  if (!targetNode) return;
+
+  if (mode.connectType === 'workflow') {
+    // Generate node connecting to a workflow
+    if (sourceNode.type === 'workflow') {
+      targetNode.connectedWorkflow = { nodeId: sourceNode.id };
+      engine.addConnection(sourceNode.id, targetNode.id);
+    }
+  } else if (mode.connectType === 'prompt') {
+    // Generate node connecting to a prompt
+    if (sourceNode.type === 'prompt') {
+      targetNode.connectedPrompt = { nodeId: sourceNode.id };
+      engine.addConnection(sourceNode.id, targetNode.id);
+    }
+  } else if (mode.inputName) {
+    // Workflow node connecting an image input
+    if (sourceNode.type === 'image') {
+      targetNode.connectInput(mode.inputName, sourceNode);
+      engine.addConnection(sourceNode.id, targetNode.id);
+    }
+  }
+
+  // Refresh properties
+  showProperties(targetNode);
+  if (targetNode.bindProperties) targetNode.bindProperties();
+}
+
+// ── Keyboard ─────────────────────────────────
+
+function setupKeyboard() {
+  document.addEventListener('keydown', (e) => {
+    const quickAdd = document.getElementById('quick-add');
+    const isQuickAddOpen = !quickAdd.classList.contains('hidden');
+
+    if (e.key === 'Escape') {
+      if (isQuickAddOpen) { quickAdd.classList.add('hidden'); return; }
+      if (window._connectMode) { window._connectMode = null; return; }
+    }
+
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+      if (e.target.id !== 'quick-add-search') return;
+      if (e.key === 'Enter') {
+        const visible = quickAdd.querySelector('.quick-add-item:not(.hidden)');
+        if (visible) visible.click();
+      }
+      return;
+    }
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      openQuickAdd();
+    }
+
+    if ((e.key === 'Delete' || e.key === 'Backspace') && engine.selectedNode) {
+      deleteNode(engine.selectedNode.id);
+    }
+  });
+}
+
+function openQuickAdd() {
+  const quickAdd = document.getElementById('quick-add');
+  const search = document.getElementById('quick-add-search');
+  const items = quickAdd.querySelectorAll('.quick-add-item');
+
+  search.value = '';
+  items.forEach(i => i.classList.remove('hidden'));
+  quickAdd.classList.remove('hidden');
+  search.focus();
+
+  search.oninput = () => {
+    const q = search.value.toLowerCase();
+    items.forEach(i => {
+      i.classList.toggle('hidden', !i.textContent.toLowerCase().includes(q));
+    });
+  };
+
+  items.forEach(i => {
+    i.onclick = () => {
+      quickAdd.classList.add('hidden');
+      const action = i.dataset.action;
+      if (action === 'image') importImage();
+      else if (action === 'prompt') addPromptNode();
+      else if (action === 'workflow') addWorkflowNode();
+      else if (action === 'generate') addGenerateNode();
+    };
+  });
+
+  const closeHandler = (e) => {
+    if (!quickAdd.contains(e.target)) {
+      quickAdd.classList.add('hidden');
+      document.removeEventListener('mousedown', closeHandler);
+    }
+  };
+  setTimeout(() => document.addEventListener('mousedown', closeHandler), 0);
+}
+
+function deleteNode(nodeId) {
+  const node = engine.nodes.get(nodeId);
+  if (!node) return;
+  if (node.fabricObject) engine.fc.remove(node.fabricObject);
+  engine.nodes.delete(nodeId);
+  engine.removeConnections(nodeId);
+  if (engine.selectedNode?.id === nodeId) {
+    engine.selectedNode = null;
+    closeProperties();
+  }
+}
+
+// ── Context Menu ─────────────────────────────
+
+let contextTarget = null;
+
+function setupContextMenu() {
+  const menu = document.getElementById('context-menu');
+
+  document.addEventListener('contextmenu', (e) => {
+    const rect = engine.fc.upperCanvasEl.getBoundingClientRect();
+    if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+      e.preventDefault();
+      let obj = engine.fc.findTarget(e);
+      while (obj && !obj.nodeId && obj.group) obj = obj.group;
+      if (obj?.nodeId) {
+        contextTarget = obj.nodeId;
+        menu.style.left = e.clientX + 'px';
+        menu.style.top = e.clientY + 'px';
+        menu.classList.remove('hidden');
+      } else {
+        menu.classList.add('hidden');
+      }
+    }
+  });
+
+  engine.fc.on('mouse:down', (e) => {
+    if (e.e.button !== 2) menu.classList.add('hidden');
+  });
+
+  menu.querySelector('[data-action="delete"]').addEventListener('click', () => {
+    if (contextTarget) {
+      deleteNode(contextTarget);
+      contextTarget = null;
+    }
+    menu.classList.add('hidden');
+  });
+
+  document.addEventListener('click', () => menu.classList.add('hidden'));
+}
+
+// ── Add Nodes ────────────────────────────────
+
+function addPromptNode() {
+  const pos = engine.canvasCenter();
+  const id = engine.nextId();
+  const node = new PromptNode(id);
+  node.createVisual(pos.x - 80, pos.y - 25);
+  engine.register(node);
+}
+
+async function addWorkflowNode() {
+  // Fetch available templates
   const resp = await fetch('/api/templates');
   const templates = await resp.json();
 
   if (templates.length === 0) {
-    list.innerHTML = '<p style="color:#888">No templates found. Add workflow templates to the templates/ directory.</p>';
+    alert('No workflow templates found. Add templates to the templates/ directory.');
     return;
   }
 
+  // Show picker
+  const modal = document.getElementById('workflow-picker');
+  const list = document.getElementById('workflow-picker-list');
+
   list.innerHTML = templates.map(t => `
     <div class="template-card" data-id="${t.id}">
-      <h4>${t.name}</h4>
-      <p>${t.description || ''}</p>
-      <div class="template-io">
-        <span>Inputs: ${(t.inputs || []).map(i => i.name).join(', ') || 'none'}</span>
-        <span>•</span>
-        <span>Output: image</span>
-      </div>
+      <h4 style="color:${t.color || '#4a9eff'}">${t.name}</h4>
+      <p style="font-size:12px;color:#888">${t.description || ''}</p>
     </div>
   `).join('');
 
+  modal.classList.remove('hidden');
+
+  document.getElementById('workflow-picker-cancel').onclick = () => modal.classList.add('hidden');
+
   list.querySelectorAll('.template-card').forEach(card => {
     card.addEventListener('click', async () => {
-      const id = card.dataset.id;
-      const resp = await fetch(`/api/templates/${id}`);
-      const template = await resp.json();
-
-      const vpt = engine.fabricCanvas.viewportTransform;
-      const zoom = engine.fabricCanvas.getZoom();
-      const cx = (engine.fabricCanvas.getWidth() / 2 - vpt[4]) / zoom;
-      const cy = (engine.fabricCanvas.getHeight() / 2 - vpt[5]) / zoom;
-
-      const node = engine.addNode(template, cx - 110, cy - 50);
       modal.classList.add('hidden');
-      showSettings(node);
-      setStatus(`Added: ${template.name}`);
+      const tResp = await fetch(`/api/templates/${card.dataset.id}`);
+      const template = await tResp.json();
+
+      const pos = engine.canvasCenter();
+      const id = engine.nextId();
+      const node = new WorkflowNode(id, {
+        templateId: template.id,
+        templateName: template.name,
+        templateColor: template.color,
+        inputs: template.inputs,
+        params: template.params,
+        workflow: template.workflow,
+      });
+      node.createVisual(pos.x - 90, pos.y - 35);
+      engine.register(node);
     });
   });
 }
 
-// ── Settings Panel ───────────────────────────
-
-function showSettings(node) {
-  const panel = document.getElementById('settings-panel');
-  const title = document.getElementById('settings-title');
-  const body = document.getElementById('settings-body');
-  const genBtn = document.getElementById('btn-generate');
-
-  title.textContent = node.template?.name || 'Node Settings';
-  body.innerHTML = node.renderSettings();
-  panel.classList.remove('hidden');
-
-  // Wire up param change listeners
-  body.querySelectorAll('[data-param]').forEach(el => {
-    const handler = () => {
-      node.params[el.dataset.param] = el.value;
-      // Update range display
-      if (el.type === 'range') {
-        el.nextElementSibling.textContent = el.value;
-      }
-    };
-    el.addEventListener('input', handler);
-    el.addEventListener('change', handler);
-  });
-
-  // Wire up image input click → connect from selected image on canvas
-  body.querySelectorAll('.image-input').forEach(el => {
-    el.addEventListener('click', () => {
-      const inputName = el.dataset.input;
-      setStatus(`Click an image on the canvas to connect to "${inputName}"...`);
-
-      // Set up a one-time click handler on canvas
-      const handler = (e) => {
-        const obj = e.target;
-        if (obj && obj.nodeId && obj.nodeId !== node.id) {
-          const sourceNode = engine.nodes.get(obj.nodeId);
-          if (sourceNode) {
-            engine.connect(obj.nodeId, node.id, inputName);
-            // Update the image input display
-            const imgUrl = sourceNode.getOutputImage?.() || sourceNode.imageUrl;
-            if (imgUrl) {
-              el.classList.add('has-image');
-              el.innerHTML = `<img src="${imgUrl}" alt="${inputName}">`;
-            }
-            setStatus(`Connected ${sourceNode.filename || sourceNode.template?.name || 'node'} → ${inputName}`);
-          }
-        }
-        engine.fabricCanvas.off('mouse:down', handler);
-      };
-      engine.fabricCanvas.on('mouse:down', handler);
-    });
-  });
-
-  genBtn.disabled = node.isGenerating;
+function addGenerateNode() {
+  const pos = engine.canvasCenter();
+  const id = engine.nextId();
+  const node = new GenerateNode(id);
+  node.createVisual(pos.x - 80, pos.y - 30);
+  engine.register(node);
 }
 
-function closeSettings() {
-  document.getElementById('settings-panel').classList.add('hidden');
-}
+// ── Generate ─────────────────────────────────
 
-// ── Generation ───────────────────────────────
-
-async function generateCurrent() {
-  const node = engine.selectedNode;
-  if (!node || node.type !== 'workflow') return;
-
-  const genBtn = document.getElementById('btn-generate');
-  genBtn.disabled = true;
-  genBtn.textContent = '⏳ Generating...';
-  showProgress();
-  setStatus(`Generating: ${node.template.name}...`);
-
+async function runGenerate(genNode) {
   try {
-    const output = await node.generate();
+    const results = await genNode.run(engine);
 
-    if (output) {
-      // Add output image to canvas next to the node
-      const nodePos = node.fabricObject;
-      const x = nodePos.left + nodePos.width + 40;
-      const y = nodePos.top;
+    // Place result images on canvas to the right of the generate node
+    const genObj = genNode.fabricObject;
+    const startX = genObj.left + genObj.width + 40;
+    let y = genObj.top;
 
-      const imgNode = await engine.addImageNode(output.imageUrl, output.comfyName, x, y);
-      engine.connect(node.id, imgNode.id, 'source');
-
-      setStatus(`Done! Output: ${output.comfyName}`);
+    for (const result of results) {
+      const dims = await getImageDimensions(result.imageUrl);
+      const id = engine.nextId();
+      const imgNode = new ImageNode(id, {
+        imageUrl: result.imageUrl,
+        filename: result.comfyName,
+        comfyName: result.comfyName,
+        width: dims.width,
+        height: dims.height,
+        format: 'PNG',
+        label: `seed: ${result.seed}`,
+      });
+      await imgNode.createVisual(startX, y);
+      engine.register(imgNode);
+      engine.addConnection(genNode.id, imgNode.id);
+      y += 250; // stack vertically
     }
-
-    // Refresh settings panel to show output
-    showSettings(node);
   } catch (err) {
-    setStatus(`Error: ${err.message}`);
-  } finally {
-    genBtn.disabled = false;
-    genBtn.textContent = '▶ Generate';
-    hideProgress();
+    alert(`Generation failed: ${err.message}`);
   }
 }
 
-// ── Save/Load ────────────────────────────────
+// ── Save / Load ──────────────────────────────
 
-function showSaveModal() {
-  const modal = document.getElementById('save-modal');
-  document.getElementById('save-modal-title').textContent = 'Save Canvas';
-  document.getElementById('canvas-name').value = '';
-  document.getElementById('canvas-list').innerHTML = '';
+function saveCanvas() {
+  const data = engine.serialize();
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'canvas-project.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
-  document.getElementById('btn-save-confirm').onclick = async () => {
-    const name = document.getElementById('canvas-name').value.trim();
-    if (!name) return;
-
-    const data = engine.serialize();
-    await fetch('/api/canvas/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, data }),
-    });
-    modal.classList.add('hidden');
-    setStatus(`Canvas saved: ${name}`);
+function loadCanvas() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    const data = JSON.parse(text);
+    await engine.deserialize(data);
   };
-
-  modal.classList.remove('hidden');
-}
-
-async function showLoadModal() {
-  const modal = document.getElementById('save-modal');
-  document.getElementById('save-modal-title').textContent = 'Load Canvas';
-  document.getElementById('btn-save-confirm').style.display = 'none';
-
-  const resp = await fetch('/api/canvas/list');
-  const canvases = await resp.json();
-
-  const list = document.getElementById('canvas-list');
-  list.innerHTML = canvases.map(name => `
-    <div class="canvas-item" data-name="${name}">${name}</div>
-  `).join('');
-
-  list.querySelectorAll('.canvas-item').forEach(el => {
-    el.addEventListener('click', async () => {
-      const resp = await fetch(`/api/canvas/load/${el.dataset.name}`);
-      const data = await resp.json();
-      await engine.deserialize(data);
-      modal.classList.add('hidden');
-      document.getElementById('btn-save-confirm').style.display = '';
-      setStatus(`Loaded: ${el.dataset.name}`);
-    });
-  });
-
-  modal.classList.remove('hidden');
-}
-
-// ── WebSocket Progress ───────────────────────
-
-function connectWS() {
-  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ws = new WebSocket(`${protocol}//${location.host}/ws`);
-
-  ws.onmessage = (event) => {
-    try {
-      const msg = JSON.parse(event.data);
-      if (msg.type === 'progress') {
-        const pct = Math.round((msg.data.value / msg.data.max) * 100);
-        updateProgress(pct, `Step ${msg.data.value}/${msg.data.max}`);
-      }
-    } catch {}
-  };
-
-  ws.onclose = () => setTimeout(connectWS, 3000);
-}
-
-// ── Progress UI ──────────────────────────────
-
-function showProgress() {
-  document.getElementById('progress-overlay').classList.remove('hidden');
-  updateProgress(0, 'Starting...');
-}
-
-function hideProgress() {
-  document.getElementById('progress-overlay').classList.add('hidden');
-}
-
-function updateProgress(pct, text) {
-  document.getElementById('progress-fill').style.width = `${pct}%`;
-  document.getElementById('progress-text').textContent = text;
-}
-
-// ── Status ───────────────────────────────────
-
-function setStatus(text) {
-  document.getElementById('status-text').textContent = text;
+  input.click();
 }
