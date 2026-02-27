@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ComfyUI Canvas</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- fabric.js for canvas engine -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+</head>
+<body>
+  <!-- Top toolbar -->
+  <div id="toolbar">
+    <div class="toolbar-group">
+      <button id="btn-add-image" title="Import Image">📷 Import</button>
+      <button id="btn-add-node" title="Add Workflow Node">➕ Add Node</button>
+      <button id="btn-zoom-fit" title="Zoom to Fit">🔲 Fit</button>
+      <button id="btn-zoom-reset" title="Reset Zoom">1:1</button>
+    </div>
+    <div class="toolbar-group">
+      <button id="btn-save" title="Save Canvas">💾 Save</button>
+      <button id="btn-load" title="Load Canvas">📂 Load</button>
+    </div>
+    <div class="toolbar-group status">
+      <span id="zoom-level">100%</span>
+      <span id="status-text">Ready</span>
+    </div>
+  </div>
+
+  <!-- Main canvas area -->
+  <canvas id="canvas"></canvas>
+
+  <!-- Node template picker modal -->
+  <div id="template-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Add Workflow Node</h3>
+      <div id="template-list"></div>
+      <button class="modal-close" onclick="document.getElementById('template-modal').classList.add('hidden')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Right panel for node settings -->
+  <div id="settings-panel" class="hidden">
+    <div id="settings-header">
+      <h3 id="settings-title">Node Settings</h3>
+      <button id="settings-close">✕</button>
+    </div>
+    <div id="settings-body"></div>
+    <div id="settings-footer">
+      <button id="btn-generate" class="btn-primary">▶ Generate</button>
+    </div>
+  </div>
+
+  <!-- Save/Load modal -->
+  <div id="save-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3 id="save-modal-title">Save Canvas</h3>
+      <input type="text" id="canvas-name" placeholder="Canvas name...">
+      <div id="canvas-list"></div>
+      <div class="modal-actions">
+        <button id="btn-save-confirm" class="btn-primary">Save</button>
+        <button class="modal-close" onclick="document.getElementById('save-modal').classList.add('hidden')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress overlay -->
+  <div id="progress-overlay" class="hidden">
+    <div id="progress-bar"><div id="progress-fill"></div></div>
+    <span id="progress-text">Generating...</span>
+  </div>
+
+  <script src="canvas-engine.js"></script>
+  <script src="workflow-nodes.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
