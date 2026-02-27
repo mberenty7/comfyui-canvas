@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ComfyUI Canvas</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=3">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 </head>
 <body>
@@ -64,6 +64,11 @@
         <label class="prop-section-label">ComfyUI URL</label>
         <input type="text" id="settings-comfy-url" class="prop-input" placeholder="http://localhost:8188">
       </div>
+      <div class="prop-section">
+        <label class="prop-section-label">Output Directory</label>
+        <input type="text" id="settings-output-dir" class="prop-input" placeholder="e.g. C:\Users\me\outputs or /home/me/outputs">
+        <p style="font-size:11px;color:#666;margin-top:4px">Where ComfyUI saves generated images. Leave blank for ComfyUI default.</p>
+      </div>
       <div class="modal-actions">
         <button id="settings-save" class="generate-btn">Save</button>
         <button id="settings-cancel" class="prop-btn">Cancel</button>
@@ -80,11 +85,11 @@
     </div>
   </div>
 
-  <script src="canvas-engine.js"></script>
-  <script src="image-node.js"></script>
-  <script src="prompt-node.js"></script>
-  <script src="workflow-node.js"></script>
-  <script src="generate-node.js"></script>
-  <script src="app.js"></script>
+  <script src="canvas-engine.js?v=3"></script>
+  <script src="image-node.js?v=3"></script>
+  <script src="prompt-node.js?v=3"></script>
+  <script src="workflow-node.js?v=3"></script>
+  <script src="generate-node.js?v=3"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

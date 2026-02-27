@@ -16,7 +16,10 @@ function loadConfig() {
   if (fs.existsSync(CONFIG_FILE)) {
     return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
   }
-  return { comfyUrl: process.env.COMFY_URL || 'http://localhost:8188' };
+  return {
+    comfyUrl: process.env.COMFY_URL || 'http://localhost:8188',
+    outputDir: process.env.OUTPUT_DIR || '',
+  };
 }
 
 function saveConfig(config) {

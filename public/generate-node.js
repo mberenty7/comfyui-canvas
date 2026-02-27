@@ -9,6 +9,7 @@ class GenerateNode {
     this.count = count || 1;
     this.seedMode = seedMode || 'increment'; // 'increment', 'random', 'fixed'
     this.baseSeed = baseSeed || Math.floor(Math.random() * 999999);
+    this.outputName = (arguments[1] && arguments[1].outputName) || 'canvas_output';
     this.label = label || '';
     this.connectedWorkflow = null; // { nodeId }
     this.isRunning = false;
@@ -151,6 +152,20 @@ class GenerateNode {
         // Build workflow with all connections resolved
         const workflow = workflowNode.buildWorkflow(engine);
 
+        // Set output filename prefix on any SaveImage nodes
+        // If outputDir is configured, prepend it as a subfolder path
+        const configResp = await fetch('/api/config');
+        const appConfig = await configResp.json();
+        const prefix = appConfig.outputDir
+          ? `${appConfig.outputDir}/${this.outputName}`
+          : this.outputName;
+
+        for (const nodeKey of Object.keys(workflow)) {
+          if (workflow[nodeKey].class_type === 'SaveImage') {
+            workflow[nodeKey].inputs.filename_prefix = prefix;
+          }
+        }
+
         // Submit to ComfyUI
         const resp = await fetch('/api/comfy/prompt', {
           method: 'POST',
@@ -209,6 +224,10 @@ class GenerateNode {
         <input type="text" id="node-label" class="prop-input" value="${this.label}" placeholder="e.g. Batch Run">
       </div>
       <div class="prop-section">
+        <label class="prop-section-label">Output Name</label>
+        <input type="text" id="gen-output-name" class="prop-input" value="${this.outputName}" placeholder="e.g. paranorman_style">
+      </div>
+      <div class="prop-section">
         <label class="prop-section-label">⚙️ Workflow</label>
         <div class="workflow-input-slot" data-connect="workflow" style="cursor:pointer">
           ${workflowStatus}
@@ -245,6 +264,9 @@ class GenerateNode {
     const labelInput = document.getElementById('node-label');
     if (labelInput) labelInput.addEventListener('input', () => this.updateLabel(labelInput.value));
 
+    const outputNameInput = document.getElementById('gen-output-name');
+    if (outputNameInput) outputNameInput.addEventListener('input', () => { this.outputName = outputNameInput.value; });
+
     const countInput = document.getElementById('gen-count');
     if (countInput) countInput.addEventListener('change', () => { this.count = parseInt(countInput.value) || 1; });
 
@@ -278,6 +300,7 @@ class GenerateNode {
       count: this.count,
       seedMode: this.seedMode,
       baseSeed: this.baseSeed,
+      outputName: this.outputName,
       label: this.label,
       connectedWorkflow: this.connectedWorkflow,
       x: this.fabricObject?.left || 0,

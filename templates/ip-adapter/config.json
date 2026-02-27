@@ -1,0 +1,130 @@
+{
+  "name": "IP Adapter",
+  "description": "Style transfer from a reference image using IP Adapter",
+  "color": "#e94560",
+  "inputs": [
+    {
+      "name": "prompt",
+      "type": "prompt",
+      "label": "Prompt",
+      "target_positive": { "node": "5", "field": "text" },
+      "target_negative": { "node": "6", "field": "text" }
+    },
+    {
+      "name": "image",
+      "type": "image",
+      "label": "Style Reference",
+      "target_node": "2",
+      "target_field": "image"
+    }
+  ],
+  "params": [
+    {
+      "name": "seed",
+      "label": "Seed",
+      "type": "seed",
+      "target_node": "8",
+      "target_field": "seed",
+      "default": 42
+    },
+    {
+      "name": "ipa_weight",
+      "label": "IP Adapter Weight",
+      "type": "slider",
+      "target_node": "4",
+      "target_field": "weight",
+      "min": 0,
+      "max": 1.5,
+      "step": 0.05,
+      "default": 0.7
+    },
+    {
+      "name": "style_boost",
+      "label": "Style Boost",
+      "type": "slider",
+      "target_node": "4",
+      "target_field": "style_boost",
+      "min": 0,
+      "max": 2,
+      "step": 0.1,
+      "default": 1.0
+    },
+    {
+      "name": "embeds_scaling",
+      "label": "Embeds Scaling",
+      "type": "select",
+      "target_node": "4",
+      "target_field": "embeds_scaling",
+      "options": ["V only", "K+V", "K+V w/ normalize", "K+mean(V) w/ normalize"],
+      "default": "V only"
+    },
+    {
+      "name": "steps",
+      "label": "Steps",
+      "type": "integer",
+      "target_node": "8",
+      "target_field": "steps",
+      "min": 1,
+      "max": 50,
+      "default": 30
+    },
+    {
+      "name": "cfg",
+      "label": "CFG Scale",
+      "type": "slider",
+      "target_node": "8",
+      "target_field": "cfg",
+      "min": 1,
+      "max": 15,
+      "step": 0.5,
+      "default": 7.0
+    },
+    {
+      "name": "width",
+      "label": "Width",
+      "type": "integer",
+      "target_node": "7",
+      "target_field": "width",
+      "min": 512,
+      "max": 2048,
+      "default": 1024
+    },
+    {
+      "name": "height",
+      "label": "Height",
+      "type": "integer",
+      "target_node": "7",
+      "target_field": "height",
+      "min": 512,
+      "max": 2048,
+      "default": 1024
+    },
+    {
+      "name": "checkpoint",
+      "label": "Checkpoint",
+      "type": "select",
+      "target_node": "1",
+      "target_field": "ckpt_name",
+      "options": ["newrealityxl_pro.safetensors", "sd_xl_base_1.0.safetensors"],
+      "default": "newrealityxl_pro.safetensors"
+    },
+    {
+      "name": "sampler",
+      "label": "Sampler",
+      "type": "select",
+      "target_node": "8",
+      "target_field": "sampler_name",
+      "options": ["euler", "euler_ancestral", "dpmpp_2m", "dpmpp_2m_sde", "res_multistep", "ddim"],
+      "default": "euler"
+    },
+    {
+      "name": "scheduler",
+      "label": "Scheduler",
+      "type": "select",
+      "target_node": "8",
+      "target_field": "scheduler",
+      "options": ["normal", "karras", "sgm_uniform", "simple"],
+      "default": "normal"
+    }
+  ]
+}

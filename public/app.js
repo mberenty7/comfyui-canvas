@@ -68,9 +68,12 @@ async function openSettings() {
   const modal = document.getElementById('settings-modal');
   const urlInput = document.getElementById('settings-comfy-url');
 
+  const dirInput = document.getElementById('settings-output-dir');
+
   const resp = await fetch('/api/config');
   const config = await resp.json();
   urlInput.value = config.comfyUrl || '';
+  dirInput.value = config.outputDir || '';
 
   modal.classList.remove('hidden');
 
@@ -78,7 +81,7 @@ async function openSettings() {
     await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ comfyUrl: urlInput.value }),
+      body: JSON.stringify({ comfyUrl: urlInput.value, outputDir: dirInput.value }),
     });
     modal.classList.add('hidden');
     checkComfyStatus();
