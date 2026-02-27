@@ -31,9 +31,25 @@ class CanvasEngine {
   _setupPanZoom() {
     let panning = false;
     let last = { x: 0, y: 0 };
+    let spaceDown = false;
+
+    // Track spacebar for space+drag panning
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        spaceDown = true;
+        this.fc.defaultCursor = 'grab';
+      }
+    });
+    document.addEventListener('keyup', (e) => {
+      if (e.code === 'Space') {
+        spaceDown = false;
+        if (!panning) this.fc.defaultCursor = 'default';
+      }
+    });
 
     this.fc.on('mouse:down', (e) => {
-      if (e.e.button === 1 || (e.e.button === 0 && e.e.altKey)) {
+      if (e.e.button === 1 || (e.e.button === 0 && (e.e.altKey || spaceDown))) {
         panning = true;
         last = { x: e.e.clientX, y: e.e.clientY };
         this.fc.selection = false;
@@ -92,7 +108,9 @@ class CanvasEngine {
       const border = this.selectedNode.fabricObject._objects[0];
       if (border) { border.set('stroke', this.selectedNode._origStroke || '#444'); this.fc.renderAll(); }
     }
-    const obj = e.selected?.[0];
+    let obj = e.selected?.[0];
+    // Walk up to find the group with nodeId
+    while (obj && !obj.nodeId && obj.group) obj = obj.group;
     if (obj?.nodeId) {
       this.selectedNode = this.nodes.get(obj.nodeId);
       // Brighten border

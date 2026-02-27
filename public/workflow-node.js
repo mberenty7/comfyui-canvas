@@ -85,7 +85,6 @@ class WorkflowNode {
       left: x, top: y,
       hasControls: false,
       hasBorders: false,
-      subTargetCheck: true,
     });
 
     group.nodeId = this.id;

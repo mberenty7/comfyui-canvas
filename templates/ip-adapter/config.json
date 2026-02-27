@@ -55,7 +55,7 @@
       "type": "select",
       "target_node": "4",
       "target_field": "embeds_scaling",
-      "options": ["V only", "K+V", "K+V w/ normalize", "K+mean(V) w/ normalize"],
+      "options": ["V only", "K+V", "K+V w/ C penalty", "K+mean(V) w/ C penalty"],
       "default": "V only"
     },
     {
