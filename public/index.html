@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ComfyUI Canvas</title>
-  <link rel="stylesheet" href="style.css?v=9">
+  <link rel="stylesheet" href="style.css?v=10">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 </head>
 <body>
@@ -89,14 +89,23 @@
     </div>
   </div>
 
-  <script src="canvas-engine.js?v=9"></script>
-  <script src="image-node.js?v=9"></script>
-  <script src="prompt-node.js?v=9"></script>
-  <script src="workflow-node.js?v=9"></script>
-  <script src="generate-node.js?v=9"></script>
-  <script src="model-node.js?v=9"></script>
-  <script src="viewer-node.js?v=9"></script>
-  <script src="viewer-3d.js?v=9"></script>
-  <script src="app.js?v=9"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script src="canvas-engine.js?v=10"></script>
+  <script src="image-node.js?v=10"></script>
+  <script src="prompt-node.js?v=10"></script>
+  <script src="workflow-node.js?v=10"></script>
+  <script src="generate-node.js?v=10"></script>
+  <script src="model-node.js?v=10"></script>
+  <script src="viewer-node.js?v=10"></script>
+  <script type="module" src="viewer-3d.js?v=10"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>

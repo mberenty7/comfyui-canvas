@@ -2,6 +2,12 @@
 // Supports GLB, GLTF, OBJ, FBX with shaders, depth/normal/color capture
 // Captures create ImageNodes on the canvas
 
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+
 class Viewer3D {
   constructor() {
     this.modal = null;
@@ -50,6 +56,7 @@ class Viewer3D {
             <section>
               <h4>Model</h4>
               <div id="viewer3d-model-info" class="viewer3d-info">No model loaded</div>
+              <div id="viewer3d-error" style="color:#ff4444;font-size:11px;font-family:monospace;white-space:pre-wrap;max-height:150px;overflow-y:auto"></div>
             </section>
 
             <section>
@@ -167,9 +174,6 @@ class Viewer3D {
   _initThree() {
     if (this.renderer) return; // already init
 
-    const { THREE } = window._threeModules;
-    const { OrbitControls } = window._threeModules;
-
     const canvas = document.getElementById('viewer3d-canvas');
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -240,7 +244,7 @@ class Viewer3D {
   }
 
   _applyShader() {
-    const { THREE } = window._threeModules;
+    
     const { vertex, fragment } = this.shaderSources;
     if (!vertex || !fragment || !this.currentModel) return;
 
@@ -270,7 +274,7 @@ class Viewer3D {
   }
 
   _loadModel(url) {
-    const { THREE, GLTFLoader, OBJLoader, FBXLoader } = window._threeModules;
+    
 
     if (this.currentModel) {
       this.scene.remove(this.currentModel);
@@ -307,7 +311,7 @@ class Viewer3D {
 
     const onError = (err) => {
       document.getElementById('viewer3d-model-info').textContent = 'Failed to load';
-      console.error(err);
+      this._showError('Model load: ' + (err.message || err));
     };
 
     if (ext === 'obj') new OBJLoader().load(url, onLoaded, undefined, onError);
@@ -327,7 +331,7 @@ class Viewer3D {
   async _captureRender(mode) {
     if (!this.currentModel) return;
 
-    const { THREE } = window._threeModules;
+    
     const { w, h } = this._getCaptureRes();
 
     const offRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -392,7 +396,7 @@ class Viewer3D {
   async _captureDepth4View() {
     if (!this.currentModel) return;
 
-    const { THREE } = window._threeModules;
+    
     const { w, h } = this._getCaptureRes();
 
     const offRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -457,7 +461,7 @@ class Viewer3D {
   }
 
   _boxCorners(box) {
-    const { THREE } = window._threeModules;
+    
     return [
       new THREE.Vector3(box.min.x, box.min.y, box.min.z),
       new THREE.Vector3(box.min.x, box.min.y, box.max.z),
@@ -500,6 +504,11 @@ class Viewer3D {
     }
   }
 
+  _showError(msg) {
+    const el = document.getElementById('viewer3d-error');
+    if (el) el.textContent = msg;
+  }
+
   // ── Open / Close / Minimize ────────────────
 
   async open(modelUrl, filename) {
@@ -507,35 +516,25 @@ class Viewer3D {
     this.pill.classList.add('hidden');
     this.minimized = false;
 
-    // Lazy-load Three.js modules
-    if (!window._threeModules) {
-      await this._loadThreeModules();
+    try {
+      this._initThree();
+
+      // Need to resize after modal is visible
+      requestAnimationFrame(() => {
+        this._resize();
+        if (!this.shaderSources.vertex) {
+          this._loadShaderPreset('fresnel');
+        }
+        if (modelUrl) {
+          this._loadModel(modelUrl);
+          document.getElementById('viewer3d-model-info').textContent = filename || 'Model';
+        }
+      });
+    } catch (err) {
+      this._showError('open(): ' + err.message + '\n' + err.stack);
     }
-
-    this._initThree();
-
-    // Need to resize after modal is visible
-    requestAnimationFrame(() => {
-      this._resize();
-      if (!this.shaderSources.vertex) {
-        this._loadShaderPreset('fresnel');
-      }
-      if (modelUrl) {
-        this._loadModel(modelUrl);
-        document.getElementById('viewer3d-model-info').textContent = filename || 'Model';
-      }
-    });
   }
 
-  async _loadThreeModules() {
-    const THREE = await import('https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js');
-    const { OrbitControls } = await import('https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/controls/OrbitControls.js');
-    const { GLTFLoader } = await import('https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/loaders/GLTFLoader.js');
-    const { OBJLoader } = await import('https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/loaders/OBJLoader.js');
-    const { FBXLoader } = await import('https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/loaders/FBXLoader.js');
-
-    window._threeModules = { THREE, OrbitControls, GLTFLoader, OBJLoader, FBXLoader };
-  }
 
   close() {
     this.modal.classList.add('hidden');
@@ -561,3 +560,5 @@ class Viewer3D {
     if (!this.animId) this._animate();
   }
 }
+
+window.Viewer3D = Viewer3D;
