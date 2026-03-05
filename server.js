@@ -19,6 +19,7 @@ function loadConfig() {
   return {
     comfyUrl: process.env.COMFY_URL || 'http://localhost:8188',
     outputDir: process.env.OUTPUT_DIR || '',
+    comfyApiKey: process.env.COMFY_API_KEY || '',
   };
 }
 
@@ -197,7 +198,12 @@ app.post('/api/comfy/upload', upload.single('image'), async (req, res) => {
 // Submit workflow to ComfyUI
 app.post('/api/comfy/prompt', async (req, res) => {
   try {
-    const result = await proxyRequest('POST', '/prompt', { prompt: req.body.workflow });
+    const payload = { prompt: req.body.workflow };
+    // Include API key for partner nodes if configured
+    if (config.comfyApiKey) {
+      payload.extra_data = { api_key: config.comfyApiKey };
+    }
+    const result = await proxyRequest('POST', '/prompt', payload);
     res.json(result.data);
   } catch (err) {
     res.status(500).json({ error: err.message });
