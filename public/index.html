@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ComfyUI Canvas</title>
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=11">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 </head>
 <body>
@@ -26,6 +26,7 @@
       <button id="btn-settings" title="Settings">⚙️</button>
     </div>
     <div class="toolbar-group status">
+      <button id="btn-log" title="ComfyUI Log">📋</button>
       <span id="comfy-status" class="status-dot disconnected" title="ComfyUI status">●</span>
       <span id="zoom-level">100%</span>
     </div>
@@ -80,6 +81,18 @@
     </div>
   </div>
 
+  <!-- Log panel -->
+  <div id="log-panel" class="hidden">
+    <div id="log-header">
+      <h3>📋 ComfyUI Log</h3>
+      <div>
+        <button id="log-clear" class="prop-btn" style="padding:4px 8px;font-size:11px">Clear</button>
+        <button id="log-close" style="background:none;border:none;color:#888;cursor:pointer;font-size:18px">✕</button>
+      </div>
+    </div>
+    <div id="log-body"></div>
+  </div>
+
   <!-- Workflow template picker modal -->
   <div id="workflow-picker" class="modal hidden">
     <div class="modal-content">
@@ -98,14 +111,14 @@
   }
   </script>
 
-  <script src="canvas-engine.js?v=10"></script>
-  <script src="image-node.js?v=10"></script>
-  <script src="prompt-node.js?v=10"></script>
-  <script src="workflow-node.js?v=10"></script>
-  <script src="generate-node.js?v=10"></script>
-  <script src="model-node.js?v=10"></script>
-  <script src="viewer-node.js?v=10"></script>
-  <script type="module" src="viewer-3d.js?v=10"></script>
-  <script src="app.js?v=10"></script>
+  <script src="canvas-engine.js?v=11"></script>
+  <script src="image-node.js?v=11"></script>
+  <script src="prompt-node.js?v=11"></script>
+  <script src="workflow-node.js?v=11"></script>
+  <script src="generate-node.js?v=11"></script>
+  <script src="model-node.js?v=11"></script>
+  <script src="viewer-node.js?v=11"></script>
+  <script type="module" src="viewer-3d.js?v=11"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>

@@ -19,6 +19,10 @@ document.addEventListener('DOMContentLoaded', () => {
   addMenu.querySelector('[data-action="viewer"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addViewerNode(); });
   addMenu.querySelector('[data-action="generate"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addGenerateNode(); });
 
+  document.getElementById('btn-log').addEventListener('click', toggleLog);
+  document.getElementById('log-close').addEventListener('click', () => document.getElementById('log-panel').classList.add('hidden'));
+  document.getElementById('log-clear').addEventListener('click', () => document.getElementById('log-body').innerHTML = '');
+
   document.getElementById('btn-save').addEventListener('click', saveCanvas);
   document.getElementById('btn-load').addEventListener('click', loadCanvas);
   document.getElementById('btn-settings').addEventListener('click', openSettings);
@@ -79,6 +83,22 @@ document.addEventListener('DOMContentLoaded', () => {
   // Poll ComfyUI status every 30s
   setInterval(checkComfyStatus, 30000);
 });
+
+// ── Log Panel ────────────────────────────────
+
+function toggleLog() {
+  document.getElementById('log-panel').classList.toggle('hidden');
+}
+
+function addLog(message, type = 'info') {
+  const body = document.getElementById('log-body');
+  const time = new Date().toLocaleTimeString();
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${type}`;
+  entry.innerHTML = `<span class="log-time">${time}</span>${message}`;
+  body.appendChild(entry);
+  body.scrollTop = body.scrollHeight;
+}
 
 // ── ComfyUI Status ───────────────────────────
 
@@ -487,7 +507,9 @@ function addGenerateNode() {
 
 async function runGenerate(genNode) {
   try {
+    addLog('Starting generation...', 'info');
     const results = await genNode.run(engine);
+    addLog(`Generation complete: ${results.length} image(s)`, 'success');
 
     // Place result images on canvas to the right of the generate node
     const genObj = genNode.fabricObject;
@@ -512,6 +534,9 @@ async function runGenerate(genNode) {
       y += 250; // stack vertically
     }
   } catch (err) {
+    addLog(`Generation failed: ${err.message}`, 'error');
+    // Auto-open log panel on error
+    document.getElementById('log-panel').classList.remove('hidden');
     alert(`Generation failed: ${err.message}`);
   }
 }

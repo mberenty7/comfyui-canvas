@@ -175,6 +175,12 @@ class GenerateNode {
         const data = await resp.json();
 
         if (data.error) throw new Error(data.error);
+        if (data.node_errors && Object.keys(data.node_errors).length > 0) {
+          const errs = Object.values(data.node_errors).map(e => e.errors?.map(x => x.message).join(', ') || 'Unknown node error').join('; ');
+          throw new Error(errs);
+        }
+
+        if (window.addLog) window.addLog(`Prompt submitted: ${data.prompt_id?.substring(0, 12)}...`, 'info');
 
         // Poll for result
         const result = await this._pollResult(data.prompt_id);
@@ -209,7 +215,20 @@ class GenerateNode {
     while (Date.now() - start < maxWait) {
       const resp = await fetch(`/api/comfy/history/${promptId}`);
       const history = await resp.json();
-      if (history[promptId]) return history[promptId];
+      if (history[promptId]) {
+        const entry = history[promptId];
+        const status = entry.status?.status_str;
+        if (status === 'error') {
+          // Extract error from messages
+          const errMsg = entry.status?.messages
+            ?.filter(m => m[0] === 'execution_error')
+            ?.map(m => m[1]?.exception_message || 'Unknown error')
+            ?.join('; ') || 'ComfyUI execution error';
+          if (window.addLog) window.addLog(`ComfyUI error: ${errMsg}`, 'error');
+          throw new Error(errMsg);
+        }
+        return entry;
+      }
       await new Promise(r => setTimeout(r, 2000));
     }
     throw new Error('Generation timed out');
