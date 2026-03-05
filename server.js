@@ -201,8 +201,12 @@ app.post('/api/comfy/prompt', async (req, res) => {
     const payload = { prompt: req.body.workflow };
     // Include API key for partner nodes if configured
     if (config.comfyApiKey) {
-      payload.extra_data = { api_key: config.comfyApiKey };
+      payload.extra_data = { api_key_comfy_org: config.comfyApiKey };
+      console.log('[Prompt] Sending with API key:', config.comfyApiKey.substring(0, 12) + '...');
+    } else {
+      console.log('[Prompt] No API key configured');
     }
+    console.log('[Prompt] Payload keys:', JSON.stringify(Object.keys(payload)));
     const result = await proxyRequest('POST', '/prompt', payload);
     res.json(result.data);
   } catch (err) {
