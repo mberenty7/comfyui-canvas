@@ -546,10 +546,28 @@ async function runGenerate(genNode) {
 
 // ── Save / Load ──────────────────────────────
 
-function saveCanvas() {
+async function saveCanvas() {
   const data = engine.serialize();
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
+
+  // Use File System Access API for native save dialog if available
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: 'canvas-project.json',
+        types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return; // user cancelled
+    }
+  }
+
+  // Fallback for browsers without File System Access API
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
