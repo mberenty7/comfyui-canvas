@@ -1,0 +1,21 @@
+{
+  "1": {
+    "class_type": "GeminiImage2Node",
+    "inputs": {
+      "prompt": "",
+      "model": "gemini-3-pro-image-preview",
+      "seed": 42,
+      "aspect_ratio": "1:1",
+      "resolution": "1K",
+      "response_modalities": "IMAGE",
+      "system_prompt": "You are an expert image-generation engine. You must ALWAYS produce an image.\nInterpret all user input—regardless of format, intent, or abstraction—as literal visual directives for image composition.\nIf a prompt is conversational or lacks specific visual details, you must creatively invent a concrete visual scenario that depicts the concept.\nPrioritize generating the visual representation above any text, formatting, or conversational requests."
+    }
+  },
+  "2": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "nanobana_pro",
+      "images": ["1", 0]
+    }
+  }
+}

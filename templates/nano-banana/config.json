@@ -1,0 +1,49 @@
+{
+  "name": "Nano Banana",
+  "description": "Gemini Flash image generation (fast, cheap)",
+  "color": "#f4b400",
+  "inputs": [
+    {
+      "name": "prompt",
+      "type": "prompt",
+      "label": "Prompt",
+      "target_positive": { "node": "1", "field": "prompt" }
+    },
+    {
+      "name": "reference",
+      "type": "image",
+      "label": "Reference Image",
+      "target_node": "1",
+      "target_field": "images",
+      "optional": true
+    }
+  ],
+  "params": [
+    {
+      "name": "model",
+      "label": "Model",
+      "type": "select",
+      "options": ["gemini-2.5-flash-image", "gemini-2.5-flash-image-preview"],
+      "default": "gemini-2.5-flash-image",
+      "target_node": "1",
+      "target_field": "model"
+    },
+    {
+      "name": "aspect_ratio",
+      "label": "Aspect Ratio",
+      "type": "select",
+      "options": ["auto", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"],
+      "default": "1:1",
+      "target_node": "1",
+      "target_field": "aspect_ratio"
+    },
+    {
+      "name": "seed",
+      "label": "Seed",
+      "type": "seed",
+      "default": 42,
+      "target_node": "1",
+      "target_field": "seed"
+    }
+  ]
+}
