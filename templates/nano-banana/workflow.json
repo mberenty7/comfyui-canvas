@@ -16,5 +16,11 @@
       "filename_prefix": "nanobana",
       "images": ["1", 0]
     }
+  },
+  "3": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": ""
+    }
   }
 }

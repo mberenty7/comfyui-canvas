@@ -13,9 +13,10 @@
       "name": "reference",
       "type": "image",
       "label": "Reference Image",
-      "target_node": "1",
-      "target_field": "images",
-      "optional": true
+      "target_node": "3",
+      "target_field": "image",
+      "optional": true,
+      "link_output": { "from_node": "3", "from_output": 0, "to_node": "1", "to_field": "images" }
     }
   ],
   "params": [

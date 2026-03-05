@@ -121,6 +121,13 @@ class WorkflowNode {
       }
     }
 
+    // Remove optional unconnected nodes (e.g. LoadImage for optional reference)
+    for (const input of this.templateInputs) {
+      if (input.optional && !this.connectedInputs[input.name] && input.target_node) {
+        delete wf[input.target_node];
+      }
+    }
+
     // Apply connected inputs
     for (const input of this.templateInputs) {
       const conn = this.connectedInputs[input.name];
@@ -144,6 +151,14 @@ class WorkflowNode {
         if (input.target_node) {
           const node = wf[input.target_node];
           if (node) node.inputs[input.target_field || 'image'] = sourceNode.comfyName;
+        }
+        // If this input has a link_output, wire the loader's output to the target node
+        if (input.link_output) {
+          const lo = input.link_output;
+          const targetNode = wf[lo.to_node];
+          if (targetNode) {
+            targetNode.inputs[lo.to_field] = [lo.from_node, lo.from_output];
+          }
         }
       }
     }
