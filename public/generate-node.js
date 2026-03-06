@@ -192,6 +192,14 @@ class GenerateNode {
               for (const img of nodeOutput.images) {
                 const imageUrl = `/api/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder || '')}&type=output`;
                 results.push({ imageUrl, comfyName: img.filename, seed: seeds[i] });
+
+                // Save sidecar metadata
+                const metadata = this._buildMetadata(workflowNode, engine, seeds[i]);
+                fetch('/api/comfy/sidecar', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ filename: img.filename, subfolder: img.subfolder || '', metadata }),
+                }).catch(err => console.warn('Failed to save sidecar:', err));
               }
             }
           }
@@ -207,6 +215,44 @@ class GenerateNode {
     this.setStatus(`Done — ${results.length} image${results.length !== 1 ? 's' : ''}`);
     this.setBorderState('done');
     return results;
+  }
+
+  _buildMetadata(workflowNode, engine, seed) {
+    const meta = {
+      timestamp: new Date().toISOString(),
+      template: workflowNode.templateName || workflowNode.templateId || 'unknown',
+      seed,
+      seedMode: this.seedMode,
+      outputName: this.outputName,
+    };
+
+    // Collect all workflow params (steps, CFG, sampler, checkpoint, resolution, etc.)
+    if (workflowNode.templateParams) {
+      meta.params = {};
+      for (const p of workflowNode.templateParams) {
+        const val = workflowNode.paramValues?.[p.name];
+        if (val !== undefined && val !== null && val !== '') {
+          meta.params[p.name] = val;
+        } else if (p.default !== undefined) {
+          meta.params[p.name] = p.default;
+        }
+      }
+    }
+
+    // Collect connected prompts
+    if (workflowNode.connectedInputs) {
+      for (const [inputName, sourceId] of Object.entries(workflowNode.connectedInputs)) {
+        const sourceNode = engine.nodes.get(sourceId);
+        if (sourceNode?.type === 'prompt') {
+          meta.positive = sourceNode.positive || '';
+          meta.negative = sourceNode.negative || '';
+        } else if (sourceNode?.type === 'image') {
+          meta[inputName + '_image'] = sourceNode.filename || sourceNode.comfyName || '';
+        }
+      }
+    }
+
+    return meta;
   }
 
   async _pollResult(promptId) {

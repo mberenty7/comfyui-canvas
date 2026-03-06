@@ -259,6 +259,30 @@ app.get('/api/comfy/status', async (req, res) => {
   }
 });
 
+// ── Sidecar metadata ─────────────────────────
+
+// Save sidecar JSON next to a ComfyUI output image
+app.post('/api/comfy/sidecar', async (req, res) => {
+  try {
+    const { filename, subfolder, metadata } = req.body;
+    if (!filename || !metadata) return res.status(400).json({ error: 'filename and metadata required' });
+
+    // Ask ComfyUI where its output dir is
+    const statsResp = await proxyRequest('GET', '/system_stats');
+    // ComfyUI doesn't expose output dir via API, so we save alongside our cached copy
+    // and also try to send to ComfyUI's output via the view path
+    const sidecarName = filename.replace(/\.(png|jpg|jpeg|webp|gif)$/i, '.json');
+
+    // Save locally in uploads/
+    const localPath = path.join(UPLOAD_DIR, sidecarName);
+    fs.writeFileSync(localPath, JSON.stringify(metadata, null, 2));
+
+    res.json({ saved: true, filename: sidecarName, localPath: `/uploads/${sidecarName}` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Gallery: Browse images ───────────────────
 
 // Browse ComfyUI output history
@@ -333,6 +357,33 @@ app.get('/api/gallery/dir', async (req, res) => {
     res.json({ images, dirPath: resolved });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Get sidecar metadata for a gallery image (checks uploads/ for cached sidecars)
+app.get('/api/gallery/sidecar', async (req, res) => {
+  try {
+    const { filename, dir } = req.query;
+    if (!filename) return res.status(400).json({ error: 'filename required' });
+    const sidecarName = filename.replace(/\.(png|jpg|jpeg|webp|gif)$/i, '.json');
+
+    // Check dir source first (custom directory)
+    if (dir) {
+      const dirPath = path.resolve(dir, sidecarName);
+      if (fs.existsSync(dirPath)) {
+        return res.json(JSON.parse(fs.readFileSync(dirPath, 'utf8')));
+      }
+    }
+
+    // Check uploads/ (our cached sidecars)
+    const localPath = path.join(UPLOAD_DIR, sidecarName);
+    if (fs.existsSync(localPath)) {
+      return res.json(JSON.parse(fs.readFileSync(localPath, 'utf8')));
+    }
+
+    res.json(null);
+  } catch (err) {
+    res.json(null);
   }
 });
 

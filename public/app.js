@@ -599,9 +599,7 @@ async function loadGallery() {
 
   try {
     let resp;
-    if (source === 'nas') {
-      resp = await fetch(`/api/gallery/dir?path=${encodeURIComponent('/mnt/cake-toppers')}`);
-    } else if (source === 'dir') {
+    if (source === 'dir') {
       const dirPath = document.getElementById('gallery-dir-path').value.trim();
       if (!dirPath) {
         body.innerHTML = '<div class="gallery-empty">Enter a directory path above</div>';
@@ -652,11 +650,75 @@ function navigateGallery(dir) {
   showGalleryLightboxImage();
 }
 
-function showGalleryLightboxImage() {
+async function showGalleryLightboxImage() {
   const img = galleryImages[galleryLightboxIndex];
   if (!img) return;
   document.getElementById('gallery-lb-img').src = galleryImageSrc(img);
   document.getElementById('gallery-lb-title').textContent = `${img.filename}  (${galleryLightboxIndex + 1}/${galleryImages.length})`;
+
+  // Fetch sidecar metadata
+  const metaPanel = document.getElementById('gallery-lb-meta');
+  metaPanel.style.display = 'none';
+  metaPanel.innerHTML = '';
+
+  try {
+    const params = new URLSearchParams({ filename: img.filename });
+    if (img.dirPath) params.set('dir', img.dirPath);
+    const resp = await fetch(`/api/gallery/sidecar?${params}`);
+    const meta = await resp.json();
+    if (!meta) return;
+
+    metaPanel.style.display = 'block';
+    let html = '<div style="display:flex;flex-direction:column;gap:12px">';
+
+    // Template & timestamp
+    html += '<div>';
+    if (meta.template) html += `<div style="color:#4a9eff;font-weight:600;margin-bottom:4px">${meta.template}</div>`;
+    if (meta.timestamp) html += `<div style="color:#666;font-size:10px">${new Date(meta.timestamp).toLocaleString()}</div>`;
+    html += '</div>';
+
+    // Prompts
+    if (meta.positive) {
+      html += `<div><div style="color:#888;font-size:10px;text-transform:uppercase;margin-bottom:2px">Positive</div><div style="color:#ccc;line-height:1.4;word-break:break-word">${escapeHtml(meta.positive)}</div></div>`;
+    }
+    if (meta.negative) {
+      html += `<div><div style="color:#888;font-size:10px;text-transform:uppercase;margin-bottom:2px">Negative</div><div style="color:#f44336;line-height:1.4;word-break:break-word">${escapeHtml(meta.negative)}</div></div>`;
+    }
+
+    // Seed
+    html += `<div><span style="color:#888">Seed:</span> <span style="color:#4caf50;font-family:monospace">${meta.seed ?? '?'}</span></div>`;
+
+    // Params
+    if (meta.params && Object.keys(meta.params).length > 0) {
+      html += '<div style="border-top:1px solid #333;padding-top:8px">';
+      html += '<div style="color:#888;font-size:10px;text-transform:uppercase;margin-bottom:4px">Parameters</div>';
+      for (const [key, val] of Object.entries(meta.params)) {
+        if (key === 'positive' || key === 'negative') continue; // already shown above
+        html += `<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #222"><span style="color:#888">${key}</span><span style="color:#ccc;font-family:monospace;font-size:11px;text-align:right;max-width:140px;overflow:hidden;text-overflow:ellipsis">${escapeHtml(String(val))}</span></div>`;
+      }
+      html += '</div>';
+    }
+
+    // Reference images
+    const refImages = Object.entries(meta).filter(([k]) => k.endsWith('_image') && meta[k]);
+    if (refImages.length > 0) {
+      html += '<div style="border-top:1px solid #333;padding-top:8px">';
+      html += '<div style="color:#888;font-size:10px;text-transform:uppercase;margin-bottom:4px">Reference Images</div>';
+      for (const [key, val] of refImages) {
+        html += `<div style="padding:2px 0;color:#ccc">${key.replace('_image', '')}: ${escapeHtml(String(val))}</div>`;
+      }
+      html += '</div>';
+    }
+
+    html += '</div>';
+    metaPanel.innerHTML = html;
+  } catch {}
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 async function placeGalleryImage() {
