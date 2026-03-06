@@ -210,6 +210,7 @@ class CanvasEngine {
 
     const nodes = data.nodes || [];
     for (const n of nodes) {
+      try {
       n.label = n.label || '';
 
       if (n.type === 'image') {
@@ -256,12 +257,16 @@ class CanvasEngine {
 
       } else if (n.type === 'generate') {
         const node = new GenerateNode(n.id, {
-          count: n.count, seedMode: n.seedMode, baseSeed: n.baseSeed, label: n.label,
+          count: n.count, seedMode: n.seedMode, baseSeed: n.baseSeed,
+          outputName: n.outputName, label: n.label,
         });
         if (n.connectedWorkflow) node.connectedWorkflow = n.connectedWorkflow;
         if (n.connectedPrompt) node.connectedPrompt = n.connectedPrompt;
         node.createVisual(n.x, n.y);
         this.register(node);
+      }
+      } catch (err) {
+        console.error(`Failed to load node ${n.id} (${n.type}):`, err);
       }
     }
 
