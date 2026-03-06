@@ -204,11 +204,12 @@ async function uploadAndPlace(file, screenX, screenY) {
   const formData = new FormData();
   formData.append('image', file);
 
-  // Upload to both local and ComfyUI
-  const resp = await fetch('/api/comfy/upload', { method: 'POST', body: formData });
+  // Upload locally first (always works)
+  const resp = await fetch('/api/upload', { method: 'POST', body: formData });
   const result = await resp.json();
+  if (result.error) { alert('Upload failed: ' + result.error); return; }
 
-  const dims = await getImageDimensions(result.localPath);
+  const dims = await getImageDimensions(result.path);
 
   const pos = screenX !== undefined
     ? engine.screenToCanvas(screenX, screenY)
@@ -216,17 +217,33 @@ async function uploadAndPlace(file, screenX, screenY) {
 
   const id = engine.nextId();
   const node = new ImageNode(id, {
-    imageUrl: result.localPath,
+    imageUrl: result.path,
     filename: result.originalName || file.name,
-    comfyName: result.comfyName,
+    comfyName: result.filename, // will be re-uploaded to ComfyUI at generate time
     width: dims.width,
     height: dims.height,
     fileSize: file.size,
     format: file.type.split('/')[1]?.toUpperCase() || '?',
+    needsComfyUpload: true,
   });
 
   await node.createVisual(pos.x - 100, pos.y - 100);
   engine.register(node);
+
+  // Try to upload to ComfyUI in background (non-blocking)
+  try {
+    const comfyForm = new FormData();
+    comfyForm.append('image', file);
+    const comfyResp = await fetch('/api/comfy/upload', { method: 'POST', body: comfyForm });
+    const comfyResult = await comfyResp.json();
+    if (comfyResult.comfyName) {
+      node.comfyName = comfyResult.comfyName;
+      node.needsComfyUpload = false;
+    }
+  } catch {
+    // ComfyUI not available — will upload when generating
+    console.log('ComfyUI not available, image will be uploaded at generate time');
+  }
 }
 
 function getImageDimensions(url) {
