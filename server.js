@@ -259,6 +259,50 @@ app.get('/api/comfy/status', async (req, res) => {
   }
 });
 
+// ── Gallery: Browse ComfyUI output images ────
+
+app.get('/api/gallery', async (req, res) => {
+  try {
+    const subfolder = req.query.subfolder || '';
+    const params = new URLSearchParams({ subfolder, type: 'output' });
+    const result = await proxyRequest('GET', `/view?${params}&filename=__list__`).catch(() => null);
+
+    // Fallback: use /history to gather recent output filenames
+    const histResult = await proxyRequest('GET', '/history?max_items=100');
+    if (histResult.status !== 200) {
+      return res.json({ images: [] });
+    }
+
+    const images = [];
+    const seen = new Set();
+    const history = histResult.data || {};
+
+    // Walk history entries (newest first by key order)
+    const entries = Object.entries(history).reverse();
+    for (const [promptId, entry] of entries) {
+      const outputs = entry.outputs || {};
+      for (const [nodeId, nodeOut] of Object.entries(outputs)) {
+        const imgs = nodeOut.images || nodeOut.gifs || [];
+        for (const img of imgs) {
+          const key = `${img.subfolder || ''}/${img.filename}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          images.push({
+            filename: img.filename,
+            subfolder: img.subfolder || '',
+            type: img.type || 'output',
+            promptId,
+          });
+        }
+      }
+    }
+
+    res.json({ images });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Start ────────────────────────────────────
 
 app.listen(PORT, '0.0.0.0', () => {

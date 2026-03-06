@@ -75,6 +75,15 @@ document.addEventListener('DOMContentLoaded', () => {
     engine.register(node);
   };
 
+  // Gallery
+  document.getElementById('btn-gallery').addEventListener('click', toggleGallery);
+  document.getElementById('gallery-close').addEventListener('click', () => document.getElementById('gallery-panel').classList.add('hidden'));
+  document.getElementById('gallery-refresh').addEventListener('click', loadGallery);
+  document.getElementById('gallery-lb-close').addEventListener('click', closeGalleryLightbox);
+  document.getElementById('gallery-lb-prev').addEventListener('click', () => navigateGallery(-1));
+  document.getElementById('gallery-lb-next').addEventListener('click', () => navigateGallery(1));
+  document.getElementById('gallery-lb-place').addEventListener('click', placeGalleryImage);
+
   setupDragDrop();
   setupContextMenu();
   setupKeyboard();
@@ -318,6 +327,15 @@ function setupKeyboard() {
     const quickAdd = document.getElementById('quick-add');
     const isQuickAddOpen = !quickAdd.classList.contains('hidden');
 
+    // Gallery lightbox keys
+    const galleryLB = document.getElementById('gallery-lightbox');
+    if (galleryLB && !galleryLB.classList.contains('hidden')) {
+      if (e.key === 'Escape') { closeGalleryLightbox(); return; }
+      if (e.key === 'ArrowLeft') { navigateGallery(-1); return; }
+      if (e.key === 'ArrowRight') { navigateGallery(1); return; }
+      return;
+    }
+
     if (e.key === 'Escape') {
       if (isQuickAddOpen) { quickAdd.classList.add('hidden'); return; }
       if (window._connectMode) { window._connectMode = null; return; }
@@ -542,6 +560,96 @@ async function runGenerate(genNode) {
     document.getElementById('log-panel').classList.remove('hidden');
     alert(`Generation failed: ${err.message}`);
   }
+}
+
+// ── Gallery ──────────────────────────────────
+
+let galleryImages = [];
+let galleryLightboxIndex = -1;
+
+function toggleGallery() {
+  const panel = document.getElementById('gallery-panel');
+  const wasHidden = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden');
+  if (wasHidden) loadGallery();
+}
+
+async function loadGallery() {
+  const body = document.getElementById('gallery-body');
+  body.innerHTML = '<div class="gallery-empty">Loading...</div>';
+
+  try {
+    const resp = await fetch('/api/gallery');
+    const data = await resp.json();
+    galleryImages = data.images || [];
+
+    if (galleryImages.length === 0) {
+      body.innerHTML = '<div class="gallery-empty">No output images yet.<br>Run a generation first!</div>';
+      return;
+    }
+
+    body.innerHTML = '';
+    galleryImages.forEach((img, i) => {
+      const thumb = document.createElement('div');
+      thumb.className = 'gallery-thumb';
+      const src = `/api/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${encodeURIComponent(img.type)}`;
+      thumb.innerHTML = `<img loading="lazy" src="${src}"><div class="gallery-name">${img.filename}</div>`;
+      thumb.addEventListener('click', () => openGalleryLightbox(i));
+      body.appendChild(thumb);
+    });
+  } catch (err) {
+    body.innerHTML = `<div class="gallery-empty">Failed to load gallery:<br>${err.message}</div>`;
+  }
+}
+
+function openGalleryLightbox(index) {
+  galleryLightboxIndex = index;
+  showGalleryLightboxImage();
+  document.getElementById('gallery-lightbox').classList.remove('hidden');
+}
+
+function closeGalleryLightbox() {
+  document.getElementById('gallery-lightbox').classList.add('hidden');
+  galleryLightboxIndex = -1;
+}
+
+function navigateGallery(dir) {
+  if (galleryImages.length === 0) return;
+  galleryLightboxIndex = (galleryLightboxIndex + dir + galleryImages.length) % galleryImages.length;
+  showGalleryLightboxImage();
+}
+
+function showGalleryLightboxImage() {
+  const img = galleryImages[galleryLightboxIndex];
+  if (!img) return;
+  const src = `/api/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${encodeURIComponent(img.type)}`;
+  document.getElementById('gallery-lb-img').src = src;
+  document.getElementById('gallery-lb-title').textContent = `${img.filename}  (${galleryLightboxIndex + 1}/${galleryImages.length})`;
+}
+
+async function placeGalleryImage() {
+  const img = galleryImages[galleryLightboxIndex];
+  if (!img) return;
+
+  const src = `/api/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${encodeURIComponent(img.type)}`;
+
+  const dims = await getImageDimensions(src);
+  const pos = engine.canvasCenter();
+  const id = engine.nextId();
+  const node = new ImageNode(id, {
+    imageUrl: src,
+    filename: img.filename,
+    comfyName: img.filename,
+    width: dims.width,
+    height: dims.height,
+    format: img.filename.split('.').pop()?.toUpperCase() || 'PNG',
+  });
+
+  await node.createVisual(pos.x - 100, pos.y - 100);
+  engine.register(node);
+
+  closeGalleryLightbox();
+  addLog(`Placed "${img.filename}" on canvas`, 'success');
 }
 
 // ── Save / Load ──────────────────────────────

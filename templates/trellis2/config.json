@@ -17,7 +17,7 @@
       "label": "Resolution",
       "type": "select",
       "options": ["512", "1024_cascade", "1536_cascade"],
-      "default": "1024_cascade",
+      "default": "512",
       "target_node": "1",
       "target_field": "resolution"
     },

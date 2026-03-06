@@ -412,6 +412,84 @@ body {
 .log-entry.info { color: #888; }
 .log-time { color: #555; margin-right: 8px; }
 
+/* ── Gallery Panel ────────────────────────────── */
+
+#gallery-panel {
+  position: fixed;
+  top: 48px;
+  left: 0;
+  width: 320px;
+  height: calc(100vh - 48px);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#gallery-panel.hidden { display: none; }
+
+#gallery-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+#gallery-header h3 { font-size: 13px; font-weight: 600; }
+
+#gallery-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  align-content: start;
+}
+
+.gallery-thumb {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.15s;
+}
+
+.gallery-thumb:hover { border-color: var(--accent); }
+
+.gallery-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gallery-thumb .gallery-name {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 2px 4px;
+  background: rgba(0,0,0,0.7);
+  font-size: 9px;
+  color: #aaa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gallery-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 40px 0;
+}
+
 /* ── 3D Viewer Modal ─────────────────────────── */
 
 .viewer3d-modal {

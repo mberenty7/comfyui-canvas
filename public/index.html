@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ComfyUI Canvas</title>
-  <link rel="stylesheet" href="style.css?v=15">
+  <link rel="stylesheet" href="style.css?v=18">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 </head>
 <body>
@@ -26,6 +26,7 @@
       <button id="btn-settings" title="Settings">⚙️</button>
     </div>
     <div class="toolbar-group status">
+      <button id="btn-gallery" title="Output Gallery">🖼️</button>
       <button id="btn-log" title="ComfyUI Log">📋</button>
       <span id="comfy-status" class="status-dot disconnected" title="ComfyUI status">●</span>
       <span id="zoom-level">100%</span>
@@ -98,6 +99,36 @@
     <div id="log-body"></div>
   </div>
 
+  <!-- Gallery panel -->
+  <div id="gallery-panel" class="hidden">
+    <div id="gallery-header">
+      <h3>🖼️ Output Gallery</h3>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button id="gallery-refresh" class="prop-btn" style="padding:4px 8px;font-size:11px">Refresh</button>
+        <button id="gallery-close" style="background:none;border:none;color:#888;cursor:pointer;font-size:18px">✕</button>
+      </div>
+    </div>
+    <div id="gallery-body"></div>
+  </div>
+
+  <!-- Gallery lightbox -->
+  <div id="gallery-lightbox" class="modal hidden">
+    <div class="modal-content" style="max-width:80vw;max-height:85vh;padding:16px;display:flex;flex-direction:column">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span id="gallery-lb-title" style="font-size:13px;color:#888;font-family:monospace"></span>
+        <div style="display:flex;gap:6px">
+          <button id="gallery-lb-place" class="generate-btn" style="width:auto;padding:6px 14px;font-size:12px">📌 Place on Canvas</button>
+          <button id="gallery-lb-close" style="background:none;border:none;color:#888;cursor:pointer;font-size:20px">✕</button>
+        </div>
+      </div>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative">
+        <button id="gallery-lb-prev" style="position:absolute;left:0;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.6);border:none;color:white;font-size:24px;padding:12px 8px;cursor:pointer;border-radius:0 6px 6px 0;z-index:1">◀</button>
+        <img id="gallery-lb-img" style="max-width:100%;max-height:70vh;border-radius:6px">
+        <button id="gallery-lb-next" style="position:absolute;right:0;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.6);border:none;color:white;font-size:24px;padding:12px 8px;cursor:pointer;border-radius:6px 0 0 6px;z-index:1">▶</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Workflow template picker modal -->
   <div id="workflow-picker" class="modal hidden">
     <div class="modal-content">
@@ -116,14 +147,14 @@
   }
   </script>
 
-  <script src="canvas-engine.js?v=15"></script>
-  <script src="image-node.js?v=15"></script>
-  <script src="prompt-node.js?v=15"></script>
-  <script src="workflow-node.js?v=15"></script>
-  <script src="generate-node.js?v=15"></script>
-  <script src="model-node.js?v=15"></script>
-  <script src="viewer-node.js?v=15"></script>
-  <script type="module" src="viewer-3d.js?v=15"></script>
-  <script src="app.js?v=15"></script>
+  <script src="canvas-engine.js?v=18"></script>
+  <script src="image-node.js?v=18"></script>
+  <script src="prompt-node.js?v=18"></script>
+  <script src="workflow-node.js?v=18"></script>
+  <script src="generate-node.js?v=18"></script>
+  <script src="model-node.js?v=18"></script>
+  <script src="viewer-node.js?v=18"></script>
+  <script type="module" src="viewer-3d.js?v=18"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>
