@@ -148,9 +148,12 @@ async function openSettings() {
 
   const resp = await fetch('/api/config');
   const config = await resp.json();
+  const metaDirInput = document.getElementById('settings-meta-dir');
+
   urlInput.value = config.comfyUrl || '';
   dirInput.value = config.outputDir || '';
   apiKeyInput.value = config.comfyApiKey || '';
+  metaDirInput.value = config.metaDir || '';
 
   modal.classList.remove('hidden');
 
@@ -158,7 +161,7 @@ async function openSettings() {
     await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ comfyUrl: urlInput.value, outputDir: dirInput.value, comfyApiKey: apiKeyInput.value }),
+      body: JSON.stringify({ comfyUrl: urlInput.value, outputDir: dirInput.value, comfyApiKey: apiKeyInput.value, metaDir: metaDirInput.value }),
     });
     modal.classList.add('hidden');
     checkComfyStatus();

@@ -20,6 +20,7 @@ function loadConfig() {
     comfyUrl: process.env.COMFY_URL || 'http://localhost:8188',
     outputDir: process.env.OUTPUT_DIR || '',
     comfyApiKey: process.env.COMFY_API_KEY || '',
+    metaDir: process.env.META_DIR || '',
   };
 }
 
@@ -261,21 +262,31 @@ app.get('/api/comfy/status', async (req, res) => {
 
 // ── Sidecar metadata ─────────────────────────
 
-// Save sidecar JSON next to a ComfyUI output image
+// Save sidecar JSON for a generated image
 app.post('/api/comfy/sidecar', async (req, res) => {
   try {
     const { filename, subfolder, metadata } = req.body;
     if (!filename || !metadata) return res.status(400).json({ error: 'filename and metadata required' });
 
-    // Ask ComfyUI where its output dir is
-    const statsResp = await proxyRequest('GET', '/system_stats');
-    // ComfyUI doesn't expose output dir via API, so we save alongside our cached copy
-    // and also try to send to ComfyUI's output via the view path
     const sidecarName = filename.replace(/\.(png|jpg|jpeg|webp|gif)$/i, '.json');
+    const jsonData = JSON.stringify(metadata, null, 2);
 
-    // Save locally in uploads/
+    // Always save locally in uploads/
     const localPath = path.join(UPLOAD_DIR, sidecarName);
-    fs.writeFileSync(localPath, JSON.stringify(metadata, null, 2));
+    fs.writeFileSync(localPath, jsonData);
+
+    // Also save to configured metadata directory if set
+    if (config.metaDir) {
+      try {
+        const metaSubdir = subfolder ? path.join(config.metaDir, subfolder) : config.metaDir;
+        fs.mkdirSync(metaSubdir, { recursive: true });
+        const metaPath = path.join(metaSubdir, sidecarName);
+        fs.writeFileSync(metaPath, jsonData);
+        console.log(`[Sidecar] Saved to ${metaPath}`);
+      } catch (err) {
+        console.error(`[Sidecar] Failed to write to metaDir: ${err.message}`);
+      }
+    }
 
     res.json({ saved: true, filename: sidecarName, localPath: `/uploads/${sidecarName}` });
   } catch (err) {
