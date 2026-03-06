@@ -174,16 +174,21 @@ class GenerateNode {
         });
         const data = await resp.json();
 
-        if (data.error) throw new Error(data.error);
+        if (window.addLog) window.addLog(`Prompt response: ${JSON.stringify(data).substring(0, 200)}`, 'info');
+
+        if (data.error) throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
         if (data.node_errors && Object.keys(data.node_errors).length > 0) {
           const errs = Object.values(data.node_errors).map(e => e.errors?.map(x => x.message).join(', ') || 'Unknown node error').join('; ');
           throw new Error(errs);
         }
 
+        if (!data.prompt_id) throw new Error('No prompt_id returned — submission may have failed');
+
         if (window.addLog) window.addLog(`Prompt submitted: ${data.prompt_id?.substring(0, 12)}...`, 'info');
 
         // Poll for result
         const result = await this._pollResult(data.prompt_id);
+        if (window.addLog) window.addLog(`Poll result keys: ${result ? Object.keys(result).join(',') : 'null'}, outputs: ${result ? JSON.stringify(Object.keys(result.outputs || {})) : 'none'}`, 'info');
         if (result) {
           const outputs = result.outputs || {};
           for (const nodeKey of Object.keys(outputs)) {
