@@ -79,6 +79,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-gallery').addEventListener('click', toggleGallery);
   document.getElementById('gallery-close').addEventListener('click', () => document.getElementById('gallery-panel').classList.add('hidden'));
   document.getElementById('gallery-refresh').addEventListener('click', loadGallery);
+  document.getElementById('gallery-source').addEventListener('change', (e) => {
+    const dirRow = document.getElementById('gallery-dir-row');
+    dirRow.style.display = e.target.value === 'dir' ? 'flex' : 'none';
+    loadGallery();
+  });
+  document.getElementById('gallery-dir-go').addEventListener('click', loadGallery);
+  document.getElementById('gallery-dir-path').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadGallery(); });
   document.getElementById('gallery-lb-close').addEventListener('click', closeGalleryLightbox);
   document.getElementById('gallery-lb-prev').addEventListener('click', () => navigateGallery(-1));
   document.getElementById('gallery-lb-next').addEventListener('click', () => navigateGallery(1));
@@ -574,17 +581,38 @@ function toggleGallery() {
   if (wasHidden) loadGallery();
 }
 
+function galleryImageSrc(img) {
+  if (img.source === 'dir') {
+    return `/api/gallery/dir/image?dir=${encodeURIComponent(img.dirPath)}&filename=${encodeURIComponent(img.filename)}`;
+  }
+  return `/api/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${encodeURIComponent(img.type)}`;
+}
+
 async function loadGallery() {
   const body = document.getElementById('gallery-body');
   body.innerHTML = '<div class="gallery-empty">Loading...</div>';
 
+  const source = document.getElementById('gallery-source').value;
+
   try {
-    const resp = await fetch('/api/gallery');
+    let resp;
+    if (source === 'dir') {
+      const dirPath = document.getElementById('gallery-dir-path').value.trim();
+      if (!dirPath) {
+        body.innerHTML = '<div class="gallery-empty">Enter a directory path above</div>';
+        return;
+      }
+      resp = await fetch(`/api/gallery/dir?path=${encodeURIComponent(dirPath)}`);
+    } else {
+      resp = await fetch('/api/gallery');
+    }
+
     const data = await resp.json();
+    if (data.error) throw new Error(data.error);
     galleryImages = data.images || [];
 
     if (galleryImages.length === 0) {
-      body.innerHTML = '<div class="gallery-empty">No output images yet.<br>Run a generation first!</div>';
+      body.innerHTML = '<div class="gallery-empty">No images found</div>';
       return;
     }
 
@@ -592,13 +620,12 @@ async function loadGallery() {
     galleryImages.forEach((img, i) => {
       const thumb = document.createElement('div');
       thumb.className = 'gallery-thumb';
-      const src = `/api/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${encodeURIComponent(img.type)}`;
-      thumb.innerHTML = `<img loading="lazy" src="${src}"><div class="gallery-name">${img.filename}</div>`;
+      thumb.innerHTML = `<img loading="lazy" src="${galleryImageSrc(img)}"><div class="gallery-name">${img.filename}</div>`;
       thumb.addEventListener('click', () => openGalleryLightbox(i));
       body.appendChild(thumb);
     });
   } catch (err) {
-    body.innerHTML = `<div class="gallery-empty">Failed to load gallery:<br>${err.message}</div>`;
+    body.innerHTML = `<div class="gallery-empty">Failed to load:<br>${err.message}</div>`;
   }
 }
 
@@ -622,8 +649,7 @@ function navigateGallery(dir) {
 function showGalleryLightboxImage() {
   const img = galleryImages[galleryLightboxIndex];
   if (!img) return;
-  const src = `/api/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${encodeURIComponent(img.type)}`;
-  document.getElementById('gallery-lb-img').src = src;
+  document.getElementById('gallery-lb-img').src = galleryImageSrc(img);
   document.getElementById('gallery-lb-title').textContent = `${img.filename}  (${galleryLightboxIndex + 1}/${galleryImages.length})`;
 }
 
@@ -631,8 +657,7 @@ async function placeGalleryImage() {
   const img = galleryImages[galleryLightboxIndex];
   if (!img) return;
 
-  const src = `/api/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${encodeURIComponent(img.type)}`;
-
+  const src = galleryImageSrc(img);
   const dims = await getImageDimensions(src);
   const pos = engine.canvasCenter();
   const id = engine.nextId();

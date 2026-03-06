@@ -259,31 +259,20 @@ app.get('/api/comfy/status', async (req, res) => {
   }
 });
 
-// ── Gallery: Browse ComfyUI output images ────
+// ── Gallery: Browse images ───────────────────
 
+// Browse ComfyUI output history
 app.get('/api/gallery', async (req, res) => {
   try {
-    const subfolder = req.query.subfolder || '';
-    const params = new URLSearchParams({ subfolder, type: 'output' });
-    const result = await proxyRequest('GET', `/view?${params}&filename=__list__`).catch(() => null);
-
-    // Fallback: use /history to gather recent output filenames
     const histResult = await proxyRequest('GET', '/history?max_items=100');
-    if (histResult.status !== 200) {
-      return res.json({ images: [] });
-    }
+    if (histResult.status !== 200) return res.json({ images: [] });
 
     const images = [];
     const seen = new Set();
-    const history = histResult.data || {};
-
-    // Walk history entries (newest first by key order)
-    const entries = Object.entries(history).reverse();
+    const entries = Object.entries(histResult.data || {}).reverse();
     for (const [promptId, entry] of entries) {
-      const outputs = entry.outputs || {};
-      for (const [nodeId, nodeOut] of Object.entries(outputs)) {
-        const imgs = nodeOut.images || nodeOut.gifs || [];
-        for (const img of imgs) {
+      for (const [, nodeOut] of Object.entries(entry.outputs || {})) {
+        for (const img of (nodeOut.images || nodeOut.gifs || [])) {
           const key = `${img.subfolder || ''}/${img.filename}`;
           if (seen.has(key)) continue;
           seen.add(key);
@@ -291,16 +280,56 @@ app.get('/api/gallery', async (req, res) => {
             filename: img.filename,
             subfolder: img.subfolder || '',
             type: img.type || 'output',
+            source: 'comfy',
             promptId,
           });
         }
       }
     }
-
     res.json({ images });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// Browse arbitrary directory
+app.get('/api/gallery/dir', async (req, res) => {
+  try {
+    const dirPath = req.query.path;
+    if (!dirPath) return res.status(400).json({ error: 'path required' });
+
+    const resolved = path.resolve(dirPath);
+    const entries = await fs.promises.readdir(resolved, { withFileTypes: true });
+    const images = [];
+
+    for (const entry of entries) {
+      if (entry.isDirectory()) continue;
+      if (!/\.(png|jpg|jpeg|webp|gif)$/i.test(entry.name)) continue;
+      const stat = await fs.promises.stat(path.join(resolved, entry.name));
+      images.push({
+        filename: entry.name,
+        source: 'dir',
+        dirPath: resolved,
+        size: stat.size,
+        modified: stat.mtime.toISOString(),
+      });
+    }
+
+    // Newest first
+    images.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+    res.json({ images, dirPath: resolved });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Serve image from arbitrary directory
+app.get('/api/gallery/dir/image', (req, res) => {
+  const { dir, filename } = req.query;
+  if (!dir || !filename) return res.status(400).json({ error: 'dir and filename required' });
+  const resolved = path.resolve(dir, path.basename(filename));
+  if (!resolved.startsWith(path.resolve(dir))) return res.status(403).json({ error: 'Invalid path' });
+  res.sendFile(resolved);
 });
 
 // ── Start ────────────────────────────────────
