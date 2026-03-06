@@ -246,8 +246,9 @@ class GenerateNode {
 
     // Collect connected prompts
     if (workflowNode.connectedInputs) {
-      for (const [inputName, sourceId] of Object.entries(workflowNode.connectedInputs)) {
-        const sourceNode = engine.nodes.get(sourceId);
+      for (const [inputName, conn] of Object.entries(workflowNode.connectedInputs)) {
+        const nodeId = typeof conn === 'string' ? conn : conn?.nodeId;
+        const sourceNode = engine.nodes.get(nodeId);
         if (sourceNode?.type === 'prompt') {
           meta.positive = sourceNode.positive || '';
           meta.negative = sourceNode.negative || '';
