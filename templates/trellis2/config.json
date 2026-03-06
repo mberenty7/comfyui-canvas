@@ -1,0 +1,84 @@
+{
+  "name": "Trellis 2 (Image → 3D)",
+  "description": "Generate a textured 3D model from an image using Microsoft TRELLIS 2",
+  "color": "#9c27b0",
+  "inputs": [
+    {
+      "name": "image",
+      "type": "image",
+      "label": "Input Image",
+      "target_node": "2",
+      "target_field": "image"
+    }
+  ],
+  "params": [
+    {
+      "name": "resolution",
+      "label": "Resolution",
+      "type": "select",
+      "options": ["512", "1024_cascade", "1536_cascade"],
+      "default": "1024_cascade",
+      "target_node": "1",
+      "target_field": "resolution"
+    },
+    {
+      "name": "ss_guidance_strength",
+      "label": "Shape Guidance",
+      "type": "slider",
+      "min": 1.0,
+      "max": 20.0,
+      "step": 0.1,
+      "default": 7.5,
+      "target_node": "5",
+      "target_field": "ss_guidance_strength"
+    },
+    {
+      "name": "shape_sampling_steps",
+      "label": "Shape Steps",
+      "type": "integer",
+      "min": 1,
+      "max": 50,
+      "default": 12,
+      "target_node": "5",
+      "target_field": "shape_sampling_steps"
+    },
+    {
+      "name": "tex_guidance_strength",
+      "label": "Texture Guidance",
+      "type": "slider",
+      "min": 1.0,
+      "max": 20.0,
+      "step": 0.1,
+      "default": 7.5,
+      "target_node": "6",
+      "target_field": "tex_guidance_strength"
+    },
+    {
+      "name": "tex_sampling_steps",
+      "label": "Texture Steps",
+      "type": "integer",
+      "min": 1,
+      "max": 50,
+      "default": 12,
+      "target_node": "6",
+      "target_field": "tex_sampling_steps"
+    },
+    {
+      "name": "render_mode",
+      "label": "Preview Mode",
+      "type": "select",
+      "options": ["normal", "clay", "base_color"],
+      "default": "normal",
+      "target_node": "7",
+      "target_field": "render_mode"
+    },
+    {
+      "name": "seed",
+      "label": "Seed",
+      "type": "seed",
+      "default": 0,
+      "target_node": "5",
+      "target_field": "seed"
+    }
+  ]
+}
