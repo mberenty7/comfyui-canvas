@@ -299,24 +299,37 @@ app.get('/api/gallery/dir', async (req, res) => {
     if (!dirPath) return res.status(400).json({ error: 'path required' });
 
     const resolved = path.resolve(dirPath);
-    const entries = await fs.promises.readdir(resolved, { withFileTypes: true });
     const images = [];
 
-    for (const entry of entries) {
-      if (entry.isDirectory()) continue;
-      if (!/\.(png|jpg|jpeg|webp|gif)$/i.test(entry.name)) continue;
-      const stat = await fs.promises.stat(path.join(resolved, entry.name));
-      images.push({
-        filename: entry.name,
-        source: 'dir',
-        dirPath: resolved,
-        size: stat.size,
-        modified: stat.mtime.toISOString(),
-      });
+    async function scanDir(dir) {
+      const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.name.startsWith('.') || entry.name.startsWith('@')) continue;
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          await scanDir(fullPath);
+        } else if (/\.(png|jpg|jpeg|webp|gif)$/i.test(entry.name)) {
+          const stat = await fs.promises.stat(fullPath);
+          if (stat.size === 0) continue;
+          const relDir = path.dirname(path.relative(resolved, fullPath)) || '';
+          images.push({
+            filename: entry.name,
+            source: 'dir',
+            dirPath: path.dirname(fullPath),
+            subfolder: relDir === '.' ? '' : relDir,
+            size: stat.size,
+            modified: stat.mtime.toISOString(),
+          });
+        }
+      }
     }
+
+    await scanDir(resolved);
 
     // Newest first
     images.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+    // Cap at 200 to avoid huge payloads
+    images.splice(200);
     res.json({ images, dirPath: resolved });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -84,6 +84,9 @@ document.addEventListener('DOMContentLoaded', () => {
     dirRow.style.display = e.target.value === 'dir' ? 'flex' : 'none';
     loadGallery();
   });
+  // Remember last gallery dir path
+  const savedGalleryDir = localStorage.getItem('gallery-dir-path');
+  if (savedGalleryDir) document.getElementById('gallery-dir-path').value = savedGalleryDir;
   document.getElementById('gallery-dir-go').addEventListener('click', loadGallery);
   document.getElementById('gallery-dir-path').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadGallery(); });
   document.getElementById('gallery-lb-close').addEventListener('click', closeGalleryLightbox);
@@ -596,12 +599,15 @@ async function loadGallery() {
 
   try {
     let resp;
-    if (source === 'dir') {
+    if (source === 'nas') {
+      resp = await fetch(`/api/gallery/dir?path=${encodeURIComponent('/mnt/cake-toppers')}`);
+    } else if (source === 'dir') {
       const dirPath = document.getElementById('gallery-dir-path').value.trim();
       if (!dirPath) {
         body.innerHTML = '<div class="gallery-empty">Enter a directory path above</div>';
         return;
       }
+      localStorage.setItem('gallery-dir-path', dirPath);
       resp = await fetch(`/api/gallery/dir?path=${encodeURIComponent(dirPath)}`);
     } else {
       resp = await fetch('/api/gallery');
