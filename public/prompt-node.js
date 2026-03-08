@@ -89,8 +89,11 @@ class PromptNode {
         <textarea id="prompt-negative" class="prop-textarea" rows="4" placeholder="Describe what to avoid...">${this.negative}</textarea>
       </div>
       <div class="prop-actions">
-        <button id="prompt-save" class="prop-btn">💾 Save Prompt</button>
-        <button id="prompt-load" class="prop-btn">📂 Load Prompt</button>
+        <button id="prompt-save" class="prop-btn">💾 Save File</button>
+        <button id="prompt-load" class="prop-btn">📂 Load File</button>
+      </div>
+      <div class="prop-section" style="margin-top:8px">
+        <button id="prompt-save-library" class="prop-btn" style="width:100%;background:#a855f7;border-color:#a855f7">📝 Save to Library</button>
       </div>
     `;
   }
@@ -139,6 +142,26 @@ class PromptNode {
       a.download = 'prompt.json';
       a.click();
       URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('prompt-save-library')?.addEventListener('click', async () => {
+      const name = prompt('Prompt name:', this.label || 'My Prompt');
+      if (!name) return;
+      try {
+        const resp = await fetch('/api/prompts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, positive: this.positive, negative: this.negative }),
+        });
+        const result = await resp.json();
+        if (result.saved) {
+          if (window.addLog) window.addLog(`Prompt "${name}" saved to library`, 'success');
+        } else {
+          alert('Failed to save: ' + (result.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Failed to save: ' + err.message);
+      }
     });
 
     document.getElementById('prompt-load')?.addEventListener('click', () => {

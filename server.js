@@ -320,6 +320,90 @@ app.post('/api/comfy/save-output', async (req, res) => {
   }
 });
 
+// ── Prompt Library ───────────────────────────
+
+function getPromptsDir() {
+  if (config.outputDir) return path.join(config.outputDir, 'Prompts');
+  return path.join(__dirname, 'prompts');
+}
+
+// List all saved prompts
+app.get('/api/prompts', async (req, res) => {
+  try {
+    const dir = getPromptsDir();
+    if (!fs.existsSync(dir)) return res.json({ prompts: [] });
+
+    const files = await fs.promises.readdir(dir);
+    const prompts = [];
+
+    for (const file of files) {
+      if (!file.endsWith('.json')) continue;
+      try {
+        const data = JSON.parse(await fs.promises.readFile(path.join(dir, file), 'utf8'));
+        prompts.push({
+          filename: file,
+          name: data.name || file.replace('.json', ''),
+          positive: data.positive || '',
+          negative: data.negative || '',
+          tags: data.tags || [],
+          created: data.created || null,
+          modified: data.modified || null,
+        });
+      } catch {}
+    }
+
+    prompts.sort((a, b) => (b.modified || b.created || '').localeCompare(a.modified || a.created || ''));
+    res.json({ prompts, dir });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Save a prompt to the library
+app.post('/api/prompts', (req, res) => {
+  try {
+    const { name, positive, negative, tags } = req.body;
+    if (!name) return res.status(400).json({ error: 'name required' });
+
+    const dir = getPromptsDir();
+    fs.mkdirSync(dir, { recursive: true });
+
+    const safeName = name.replace(/[^a-zA-Z0-9_\- ]/g, '').trim();
+    const filename = `${safeName}.json`;
+    const filePath = path.join(dir, filename);
+
+    const existing = fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, 'utf8')) : {};
+
+    const data = {
+      name: safeName,
+      positive: positive || '',
+      negative: negative || '',
+      tags: tags || [],
+      created: existing.created || new Date().toISOString(),
+      modified: new Date().toISOString(),
+    };
+
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+    console.log(`[Prompts] Saved: ${filePath}`);
+    res.json({ saved: true, filename });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete a prompt from the library
+app.delete('/api/prompts/:filename', (req, res) => {
+  try {
+    const dir = getPromptsDir();
+    const filePath = path.join(dir, path.basename(req.params.filename));
+    if (!filePath.startsWith(dir)) return res.status(403).json({ error: 'Invalid path' });
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    res.json({ deleted: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Gallery: Browse images ───────────────────
 
 // Browse ComfyUI output history

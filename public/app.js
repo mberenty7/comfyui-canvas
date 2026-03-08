@@ -75,6 +75,12 @@ document.addEventListener('DOMContentLoaded', () => {
     engine.register(node);
   };
 
+  // Prompt Library
+  document.getElementById('btn-prompts').addEventListener('click', togglePromptLibrary);
+  document.getElementById('prompts-close').addEventListener('click', () => document.getElementById('prompts-panel').classList.add('hidden'));
+  document.getElementById('prompts-refresh').addEventListener('click', loadPromptLibrary);
+  document.getElementById('prompts-filter').addEventListener('input', filterPromptLibrary);
+
   // Gallery
   document.getElementById('btn-gallery').addEventListener('click', toggleGallery);
   document.getElementById('gallery-close').addEventListener('click', () => document.getElementById('gallery-panel').classList.add('hidden'));
@@ -589,6 +595,122 @@ async function runGenerate(genNode) {
   }
 }
 
+// ── Prompt Library ───────────────────────────
+
+let allPrompts = [];
+
+function togglePromptLibrary() {
+  const panel = document.getElementById('prompts-panel');
+  // Close gallery if open
+  document.getElementById('gallery-panel').classList.add('hidden');
+  const wasHidden = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden');
+  if (wasHidden) loadPromptLibrary();
+}
+
+async function loadPromptLibrary() {
+  const body = document.getElementById('prompts-body');
+  body.innerHTML = '<div class="prompts-empty">Loading...</div>';
+
+  try {
+    const resp = await fetch('/api/prompts');
+    const data = await resp.json();
+    allPrompts = data.prompts || [];
+
+    if (allPrompts.length === 0) {
+      body.innerHTML = '<div class="prompts-empty">No saved prompts yet.<br>Select a Prompt node and click "Save to Library"</div>';
+      return;
+    }
+
+    renderPromptCards(allPrompts);
+  } catch (err) {
+    body.innerHTML = `<div class="prompts-empty">Failed to load:<br>${err.message}</div>`;
+  }
+}
+
+function filterPromptLibrary() {
+  const query = document.getElementById('prompts-filter').value.toLowerCase();
+  if (!query) {
+    renderPromptCards(allPrompts);
+    return;
+  }
+  const filtered = allPrompts.filter(p => {
+    const haystack = [p.name, p.positive, p.negative, ...(p.tags || [])].join(' ').toLowerCase();
+    return haystack.includes(query);
+  });
+  renderPromptCards(filtered);
+}
+
+function renderPromptCards(prompts) {
+  const body = document.getElementById('prompts-body');
+  body.innerHTML = '';
+
+  if (prompts.length === 0) {
+    body.innerHTML = '<div class="prompts-empty">No matching prompts</div>';
+    return;
+  }
+
+  for (const p of prompts) {
+    const card = document.createElement('div');
+    card.className = 'prompt-card';
+
+    let html = `<div class="prompt-card-name">${escapeHtml(p.name)}</div>`;
+    if (p.positive) html += `<div class="prompt-card-text">${escapeHtml(p.positive)}</div>`;
+    if (p.negative) html += `<div class="prompt-card-neg">⛔ ${escapeHtml(p.negative)}</div>`;
+
+    html += `<div class="prompt-card-footer">`;
+    if (p.modified) {
+      html += `<span class="prompt-card-date">${new Date(p.modified).toLocaleDateString()}</span>`;
+    } else {
+      html += `<span></span>`;
+    }
+    html += `<div class="prompt-card-actions">
+      <button class="prompt-card-btn place-btn" title="Place on canvas">📌 Place</button>
+      <button class="prompt-card-btn delete prompt-delete-btn" title="Delete">🗑</button>
+    </div>`;
+    html += `</div>`;
+
+    card.innerHTML = html;
+
+    // Place on canvas
+    card.querySelector('.place-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      placePromptFromLibrary(p);
+    });
+
+    // Also place on card click (whole card)
+    card.addEventListener('click', () => placePromptFromLibrary(p));
+
+    // Delete
+    card.querySelector('.prompt-delete-btn').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm(`Delete prompt "${p.name}"?`)) return;
+      try {
+        await fetch(`/api/prompts/${encodeURIComponent(p.filename)}`, { method: 'DELETE' });
+        loadPromptLibrary();
+        addLog(`Deleted prompt "${p.name}"`, 'info');
+      } catch (err) {
+        alert('Failed to delete: ' + err.message);
+      }
+    });
+
+    body.appendChild(card);
+  }
+}
+
+function placePromptFromLibrary(p) {
+  const pos = engine.canvasCenter();
+  const id = engine.nextId();
+  const node = new PromptNode(id, {
+    positive: p.positive,
+    negative: p.negative,
+    label: p.name,
+  });
+  node.createVisual(pos.x - 80, pos.y - 25);
+  engine.register(node);
+  addLog(`Placed prompt "${p.name}" on canvas`, 'success');
+}
+
 // ── Gallery ──────────────────────────────────
 
 let galleryImages = [];
@@ -596,6 +718,8 @@ let galleryLightboxIndex = -1;
 
 function toggleGallery() {
   const panel = document.getElementById('gallery-panel');
+  // Close prompt library if open
+  document.getElementById('prompts-panel').classList.add('hidden');
   const wasHidden = panel.classList.contains('hidden');
   panel.classList.toggle('hidden');
   if (wasHidden) loadGallery();

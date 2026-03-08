@@ -412,6 +412,120 @@ body {
 .log-entry.info { color: #888; }
 .log-time { color: #555; margin-right: 8px; }
 
+/* ── Prompt Library Panel ─────────────────────── */
+
+#prompts-panel {
+  position: fixed;
+  top: 48px;
+  left: 0;
+  width: 340px;
+  height: calc(100vh - 48px);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#prompts-panel.hidden { display: none; }
+
+#prompts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+#prompts-header h3 { font-size: 13px; font-weight: 600; }
+
+#prompts-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prompt-card {
+  background: #1a1a2e;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.prompt-card:hover { border-color: #a855f7; }
+
+.prompt-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #a855f7;
+  margin-bottom: 4px;
+}
+
+.prompt-card-text {
+  font-size: 11px;
+  color: #aaa;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.prompt-card-neg {
+  font-size: 10px;
+  color: #f44336;
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.prompt-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.prompt-card-date {
+  font-size: 9px;
+  color: #555;
+}
+
+.prompt-card-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.prompt-card-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.prompt-card-btn:hover { background: #0f3460; color: var(--text); }
+.prompt-card-btn.delete:hover { background: #5c1a1a; color: #f44336; }
+
+.prompts-empty {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 40px 0;
+}
+
 /* ── Gallery Panel ────────────────────────────── */
 
 #gallery-panel {
