@@ -868,12 +868,28 @@ async function placeGalleryImage() {
 
   const src = galleryImageSrc(img);
   const dims = await getImageDimensions(src);
+
+  // Fetch the image and re-upload to ComfyUI's input so it can be used as a reference
+  let comfyName = img.filename;
+  try {
+    const imgResp = await fetch(src);
+    const blob = await imgResp.blob();
+    const file = new File([blob], img.filename, { type: blob.type });
+    const formData = new FormData();
+    formData.append('image', file);
+    const uploadResp = await fetch('/api/comfy/upload', { method: 'POST', body: formData });
+    const uploadResult = await uploadResp.json();
+    if (uploadResult.comfyName) comfyName = uploadResult.comfyName;
+  } catch (err) {
+    console.warn('Failed to upload gallery image to ComfyUI:', err);
+  }
+
   const pos = engine.canvasCenter();
   const id = engine.nextId();
   const node = new ImageNode(id, {
     imageUrl: src,
     filename: img.filename,
-    comfyName: img.filename,
+    comfyName: comfyName,
     width: dims.width,
     height: dims.height,
     format: img.filename.split('.').pop()?.toUpperCase() || 'PNG',
