@@ -152,17 +152,10 @@ class GenerateNode {
         // Build workflow with all connections resolved
         const workflow = workflowNode.buildWorkflow(engine);
 
-        // Set output filename prefix on any SaveImage nodes
-        // If outputDir is configured, prepend it as a subfolder path
-        const configResp = await fetch('/api/config');
-        const appConfig = await configResp.json();
-        const prefix = appConfig.outputDir
-          ? `${appConfig.outputDir}/${this.outputName}`
-          : this.outputName;
-
+        // Set output filename prefix on SaveImage nodes
         for (const nodeKey of Object.keys(workflow)) {
           if (workflow[nodeKey].class_type === 'SaveImage') {
-            workflow[nodeKey].inputs.filename_prefix = prefix;
+            workflow[nodeKey].inputs.filename_prefix = this.outputName;
           }
         }
 
@@ -198,13 +191,18 @@ class GenerateNode {
                 const imageUrl = `/api/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder || '')}&type=output`;
                 results.push({ imageUrl, comfyName: img.filename, seed: seeds[i] });
 
-                // Save sidecar metadata
+                // Save image + sidecar metadata to output directory
                 const metadata = this._buildMetadata(workflowNode, engine, seeds[i]);
-                fetch('/api/comfy/sidecar', {
+                fetch('/api/comfy/save-output', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ filename: img.filename, subfolder: img.subfolder || '', metadata }),
-                }).catch(err => console.warn('Failed to save sidecar:', err));
+                  body: JSON.stringify({
+                    filename: img.filename,
+                    subfolder: img.subfolder || '',
+                    type: img.type || 'output',
+                    metadata,
+                  }),
+                }).catch(err => console.warn('Failed to save output:', err));
               }
             }
           }

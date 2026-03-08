@@ -20,7 +20,6 @@ function loadConfig() {
     comfyUrl: process.env.COMFY_URL || 'http://localhost:8188',
     outputDir: process.env.OUTPUT_DIR || '',
     comfyApiKey: process.env.COMFY_API_KEY || '',
-    metaDir: process.env.META_DIR || '',
   };
 }
 
@@ -262,33 +261,60 @@ app.get('/api/comfy/status', async (req, res) => {
 
 // ── Sidecar metadata ─────────────────────────
 
-// Save sidecar JSON for a generated image
-app.post('/api/comfy/sidecar', async (req, res) => {
+// Save generation output: fetch image from ComfyUI, save image + sidecar to output dir
+app.post('/api/comfy/save-output', async (req, res) => {
   try {
-    const { filename, subfolder, metadata } = req.body;
-    if (!filename || !metadata) return res.status(400).json({ error: 'filename and metadata required' });
+    const { filename, subfolder, type, metadata } = req.body;
+    if (!filename) return res.status(400).json({ error: 'filename required' });
 
     const sidecarName = filename.replace(/\.(png|jpg|jpeg|webp|gif)$/i, '.json');
-    const jsonData = JSON.stringify(metadata, null, 2);
+    const jsonData = metadata ? JSON.stringify(metadata, null, 2) : null;
 
-    // Always save locally in uploads/
-    const localPath = path.join(UPLOAD_DIR, sidecarName);
-    fs.writeFileSync(localPath, jsonData);
+    // Always save sidecar locally in uploads/
+    if (jsonData) {
+      fs.writeFileSync(path.join(UPLOAD_DIR, sidecarName), jsonData);
+    }
 
-    // Also save to configured metadata directory if set
-    if (config.metaDir) {
+    // If output directory is configured, fetch image from ComfyUI and save both there
+    const outputDir = config.outputDir;
+    if (outputDir) {
       try {
-        const metaSubdir = subfolder ? path.join(config.metaDir, subfolder) : config.metaDir;
-        fs.mkdirSync(metaSubdir, { recursive: true });
-        const metaPath = path.join(metaSubdir, sidecarName);
-        fs.writeFileSync(metaPath, jsonData);
-        console.log(`[Sidecar] Saved to ${metaPath}`);
+        const outSubdir = subfolder ? path.join(outputDir, subfolder) : outputDir;
+        fs.mkdirSync(outSubdir, { recursive: true });
+
+        // Fetch image from ComfyUI and save to output dir
+        const params = new URLSearchParams({
+          filename,
+          subfolder: subfolder || '',
+          type: type || 'output',
+        });
+        const url = new URL(`${config.comfyUrl}/view?${params}`);
+
+        await new Promise((resolve, reject) => {
+          http.get(url, (resp) => {
+            const imgPath = path.join(outSubdir, filename);
+            const writeStream = fs.createWriteStream(imgPath);
+            resp.pipe(writeStream);
+            writeStream.on('finish', () => {
+              console.log(`[Output] Image saved to ${imgPath}`);
+              resolve();
+            });
+            writeStream.on('error', reject);
+          }).on('error', reject);
+        });
+
+        // Save sidecar JSON alongside image
+        if (jsonData) {
+          const metaPath = path.join(outSubdir, sidecarName);
+          fs.writeFileSync(metaPath, jsonData);
+          console.log(`[Output] Sidecar saved to ${metaPath}`);
+        }
       } catch (err) {
-        console.error(`[Sidecar] Failed to write to metaDir: ${err.message}`);
+        console.error(`[Output] Failed to save to output dir: ${err.message}`);
       }
     }
 
-    res.json({ saved: true, filename: sidecarName, localPath: `/uploads/${sidecarName}` });
+    res.json({ saved: true, filename });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
