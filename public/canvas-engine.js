@@ -137,6 +137,7 @@ class CanvasEngine {
     // Avoid duplicates
     if (!this.connections.find(c => c.fromId === fromId && c.toId === toId)) {
       this.connections.push({ fromId, toId });
+      if (window._scheduleAutosave) window._scheduleAutosave();
       this._drawConnections();
     }
   }

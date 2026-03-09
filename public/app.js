@@ -118,6 +118,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Poll ComfyUI status every 30s
   setInterval(checkComfyStatus, 30000);
+
+  // Auto-restore from localStorage
+  try {
+    const saved = localStorage.getItem('comfyui-canvas-autosave');
+    if (saved) {
+      const data = JSON.parse(saved);
+      engine.deserialize(data).then(() => {
+        if (window.addLog) window.addLog('Canvas restored from autosave', 'info');
+      }).catch(err => {
+        console.error('Autosave restore failed:', err);
+        if (window.addLog) window.addLog(`Autosave restore failed: ${err.message}`, 'error');
+      });
+    }
+  } catch (e) {
+    console.error('Failed to parse autosave:', e);
+  }
+
+  // Autosave on changes (debounced)
+  let autosaveTimer = null;
+  function scheduleAutosave() {
+    if (autosaveTimer) clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => {
+      try {
+        const data = engine.serialize();
+        localStorage.setItem('comfyui-canvas-autosave', JSON.stringify(data));
+      } catch (e) {
+        console.warn('Autosave failed:', e);
+      }
+    }, 1000);
+  }
+  engine.fc.on('object:modified', scheduleAutosave);
+  engine.fc.on('object:added', scheduleAutosave);
+  engine.fc.on('object:removed', scheduleAutosave);
+  window._scheduleAutosave = scheduleAutosave;
+
+  // Periodic autosave every 10s as catch-all for property changes
+  setInterval(scheduleAutosave, 10000);
 });
 
 // ── Log Panel ────────────────────────────────
@@ -475,6 +512,7 @@ function deleteNode(nodeId) {
     engine.selectedNode = null;
     closeProperties();
   }
+  if (window._scheduleAutosave) window._scheduleAutosave();
 }
 
 // ── Context Menu ─────────────────────────────

@@ -64,6 +64,24 @@
       "target_field": "denoise"
     },
     {
+      "name": "grow_mask_by",
+      "label": "Grow Mask By",
+      "type": "integer",
+      "default": 16,
+      "min": 0,
+      "max": 64,
+      "target_node": "5",
+      "target_field": "grow_mask_by"
+    },
+    {
+      "name": "feather",
+      "label": "Mask Feather",
+      "type": "integer",
+      "default": 20,
+      "min": 0,
+      "max": 100
+    },
+    {
       "name": "seed",
       "label": "Seed",
       "type": "seed",

@@ -581,7 +581,11 @@ app.post('/api/bfl/generate', async (req, res) => {
     if (image) body.image = image;
     if (mask) body.mask = mask;
 
-    console.log(`[BFL] Submitting to ${apiPath}: prompt="${prompt?.substring(0, 60)}..."`);
+    console.log(`[BFL] Submitting to ${apiPath}: prompt="${prompt?.substring(0, 60)}...", hasImage=${!!image}, imageLen=${image?.length || 0}, hasMask=${!!mask}, maskLen=${mask?.length || 0}`);
+    // Debug: save image and mask to disk for inspection
+    if (image) fs.writeFileSync(path.join(UPLOAD_DIR, '_debug_bfl_image.png'), Buffer.from(image, 'base64'));
+    if (mask) fs.writeFileSync(path.join(UPLOAD_DIR, '_debug_bfl_mask.png'), Buffer.from(mask, 'base64'));
+    console.log(`[BFL] Body keys: ${Object.keys(body).join(', ')}`);
     const result = await bflRequest('POST', apiPath, body);
 
     if (result.status !== 200) {

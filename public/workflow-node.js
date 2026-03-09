@@ -141,7 +141,7 @@ class WorkflowNode {
       // InpaintNode as source — provides image+mask+prompt
       if (sourceNode.type === 'inpaint') {
         const imgData = sourceNode.getImageData(engine);
-        const promptData = sourceNode.getPromptData(engine);
+        // prompts come from direct Prompt node connection
 
         if (input.type === 'image' && imgData) {
           if (input.target_node) {
@@ -150,14 +150,32 @@ class WorkflowNode {
           }
           // Wire mask
           if (input.uses_mask && imgData.maskComfyName) {
-            const maskNodeId = input.target_node + '_mask';
-            wf[maskNodeId] = {
+            const maskLoadId = input.target_node + '_mask_load';
+            const maskConvertId = input.target_node + '_mask_convert';
+            // Load the B/W mask image
+            wf[maskLoadId] = {
               class_type: 'LoadImage',
               inputs: { image: imgData.maskComfyName },
             };
+            // Convert B/W image to mask (use red channel)
+            wf[maskConvertId] = {
+              class_type: 'ImageToMask',
+              inputs: { image: [maskLoadId, 0], channel: 'red' },
+            };
+            // Optional feather (blur mask edges for smooth transitions)
+            const featherVal = parseInt(this.paramValues?.feather) || 0;
+            let finalMaskRef = [maskConvertId, 0];
+            if (featherVal > 0) {
+              const featherId = input.target_node + '_mask_feather';
+              wf[featherId] = {
+                class_type: 'FeatherMask',
+                inputs: { mask: [maskConvertId, 0], left: featherVal, top: featherVal, right: featherVal, bottom: featherVal },
+              };
+              finalMaskRef = [featherId, 0];
+            }
             for (const nodeKey of Object.keys(wf)) {
               if (wf[nodeKey].class_type === 'VAEEncodeForInpaint') {
-                wf[nodeKey].inputs.mask = [maskNodeId, 1];
+                wf[nodeKey].inputs.mask = finalMaskRef;
               }
             }
           }
@@ -191,18 +209,30 @@ class WorkflowNode {
         // The LoadImage node outputs [IMAGE, MASK] — mask is output index 1
         // VAEEncodeForInpaint expects mask from the LoadImage node
         if (input.uses_mask && sourceNode.maskComfyName) {
-          // The mask is loaded from the same LoadImage node's second output (index 1)
-          // But we need to load the mask separately since it's a different image
-          // Add a separate LoadImage node for the mask
-          const maskNodeId = input.target_node + '_mask';
-          wf[maskNodeId] = {
+          const maskLoadId = input.target_node + '_mask_load';
+          const maskConvertId = input.target_node + '_mask_convert';
+          wf[maskLoadId] = {
             class_type: 'LoadImage',
             inputs: { image: sourceNode.maskComfyName },
           };
-          // Find the VAEEncodeForInpaint node and wire the mask
+          wf[maskConvertId] = {
+            class_type: 'ImageToMask',
+            inputs: { image: [maskLoadId, 0], channel: 'red' },
+          };
+          // Optional feather (blur mask edges for smooth transitions)
+          const featherVal2 = parseInt(this.paramValues?.feather) || 0;
+          let finalMaskRef2 = [maskConvertId, 0];
+          if (featherVal2 > 0) {
+            const featherId2 = input.target_node + '_mask_feather';
+            wf[featherId2] = {
+              class_type: 'FeatherMask',
+              inputs: { mask: [maskConvertId, 0], left: featherVal2, top: featherVal2, right: featherVal2, bottom: featherVal2 },
+            };
+            finalMaskRef2 = [featherId2, 0];
+          }
           for (const nodeKey of Object.keys(wf)) {
             if (wf[nodeKey].class_type === 'VAEEncodeForInpaint') {
-              wf[nodeKey].inputs.mask = [maskNodeId, 1];
+              wf[nodeKey].inputs.mask = finalMaskRef2;
             }
           }
         }

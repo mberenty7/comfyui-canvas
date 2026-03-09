@@ -291,9 +291,15 @@ class GenerateNode {
 
           // Get mask as base64
           if (maskUrl) {
-            const maskResp = await fetch(`/api/image-base64?url=${encodeURIComponent(maskUrl)}`);
-            const maskData = await maskResp.json();
-            if (maskData.base64) maskBase64 = maskData.base64;
+            if (maskUrl.startsWith('data:')) {
+              // Already a data URL — extract base64 directly
+              const commaIdx = maskUrl.indexOf(',');
+              if (commaIdx !== -1) maskBase64 = maskUrl.substring(commaIdx + 1);
+            } else {
+              const maskResp = await fetch(`/api/image-base64?url=${encodeURIComponent(maskUrl)}`);
+              const maskData = await maskResp.json();
+              if (maskData.base64) maskBase64 = maskData.base64;
+            }
           }
         }
 
