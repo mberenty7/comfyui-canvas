@@ -65,8 +65,8 @@
       "type": "select",
       "target_node": "1",
       "target_field": "ckpt_name",
-      "options": ["newrealityxl_pro.safetensors", "sd_xl_base_1.0.safetensors"],
-      "default": "newrealityxl_pro.safetensors"
+      "options": ["juggernautXL_ragnarok.safetensors", "perfectdeliberate_v60.safetensors", "newrealityxl_pro.safetensors", "sd_xl_base_1.0.safetensors"],
+      "default": "juggernautXL_ragnarok.safetensors"
     },
     {
       "name": "sampler",
