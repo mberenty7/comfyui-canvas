@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
@@ -20,6 +21,7 @@ function loadConfig() {
     comfyUrl: process.env.COMFY_URL || 'http://localhost:8188',
     outputDir: process.env.OUTPUT_DIR || '',
     comfyApiKey: process.env.COMFY_API_KEY || '',
+    bflApiKey: process.env.BFL_API_KEY || '',
   };
 }
 
@@ -515,6 +517,186 @@ app.get('/api/gallery/dir/image', (req, res) => {
   const resolved = path.resolve(dir, path.basename(filename));
   if (!resolved.startsWith(path.resolve(dir))) return res.status(403).json({ error: 'Invalid path' });
   res.sendFile(resolved);
+});
+
+// ── BFL (Flux) API ───────────────────────────
+
+function bflRequest(method, urlPath, body) {
+  return new Promise((resolve, reject) => {
+    const url = new URL('https://api.bfl.ai' + urlPath);
+    const data = body ? JSON.stringify(body) : null;
+    const opts = {
+      hostname: url.hostname,
+      port: 443,
+      path: url.pathname + url.search,
+      method,
+      headers: {
+        'accept': 'application/json',
+        'x-key': config.bflApiKey,
+      },
+    };
+    if (data) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.headers['Content-Length'] = Buffer.byteLength(data);
+    }
+    const req = https.request(opts, (res) => {
+      let chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        try { resolve({ status: res.statusCode, data: JSON.parse(buf.toString()) }); }
+        catch { resolve({ status: res.statusCode, data: buf.toString() }); }
+      });
+    });
+    req.on('error', reject);
+    if (data) req.write(data);
+    req.end();
+  });
+}
+
+// Submit a BFL generation request
+app.post('/api/bfl/generate', async (req, res) => {
+  try {
+    if (!config.bflApiKey) return res.status(400).json({ error: 'BFL API key not configured. Add it in Settings.' });
+
+    const { endpoint, prompt, params, image, mask } = req.body;
+    const apiPath = endpoint || '/v1/flux-pro-1.1';
+
+    // Build request body
+    const body = { prompt };
+
+    // Apply params
+    if (params) {
+      for (const [key, val] of Object.entries(params)) {
+        if (key === 'model') continue; // model is used to pick endpoint
+        if (val !== undefined && val !== null && val !== '') {
+          // Convert numeric strings
+          const num = Number(val);
+          body[key] = isNaN(num) ? val : num;
+        }
+      }
+    }
+
+    // For inpainting — image and mask as base64
+    if (image) body.image = image;
+    if (mask) body.mask = mask;
+
+    console.log(`[BFL] Submitting to ${apiPath}: prompt="${prompt?.substring(0, 60)}..."`);
+    const result = await bflRequest('POST', apiPath, body);
+
+    if (result.status !== 200) {
+      console.error('[BFL] Submit error:', result.data);
+      return res.status(result.status).json({ error: result.data?.detail || result.data || 'BFL API error' });
+    }
+
+    res.json(result.data); // { id, polling_url }
+  } catch (err) {
+    console.error('[BFL] Generate error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Poll a BFL generation result
+app.get('/api/bfl/result/:id', async (req, res) => {
+  try {
+    if (!config.bflApiKey) return res.status(400).json({ error: 'BFL API key not configured' });
+
+    const result = await bflRequest('GET', `/v1/get_result?id=${req.params.id}`);
+    res.json(result.data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Download a BFL result image and save it locally (+ output dir)
+app.post('/api/bfl/save', async (req, res) => {
+  try {
+    const { imageUrl, filename, metadata } = req.body;
+    if (!imageUrl || !filename) return res.status(400).json({ error: 'imageUrl and filename required' });
+
+    // Download image from BFL CDN
+    const imgBuf = await new Promise((resolve, reject) => {
+      https.get(imageUrl, (resp) => {
+        const chunks = [];
+        resp.on('data', c => chunks.push(c));
+        resp.on('end', () => resolve(Buffer.concat(chunks)));
+        resp.on('error', reject);
+      }).on('error', reject);
+    });
+
+    // Save to uploads/
+    const localPath = path.join(UPLOAD_DIR, filename);
+    fs.writeFileSync(localPath, imgBuf);
+    console.log(`[BFL] Image saved to ${localPath} (${imgBuf.length} bytes)`);
+
+    // Save sidecar metadata
+    const sidecarName = filename.replace(/\.(png|jpg|jpeg|webp)$/i, '.json');
+    if (metadata) {
+      fs.writeFileSync(path.join(UPLOAD_DIR, sidecarName), JSON.stringify(metadata, null, 2));
+    }
+
+    // Copy to output directory if configured
+    if (config.outputDir) {
+      try {
+        fs.mkdirSync(config.outputDir, { recursive: true });
+        fs.writeFileSync(path.join(config.outputDir, filename), imgBuf);
+        if (metadata) {
+          fs.writeFileSync(path.join(config.outputDir, sidecarName), JSON.stringify(metadata, null, 2));
+        }
+        console.log(`[BFL] Output saved to ${config.outputDir}/${filename}`);
+      } catch (err) {
+        console.error(`[BFL] Failed to save to output dir: ${err.message}`);
+      }
+    }
+
+    res.json({ saved: true, path: `/uploads/${filename}` });
+  } catch (err) {
+    console.error('[BFL] Save error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Read a local image file and return base64 (for BFL inpaint)
+app.get('/api/image-base64', async (req, res) => {
+  try {
+    const { url: imgUrl } = req.query;
+    if (!imgUrl) return res.status(400).json({ error: 'url required' });
+
+    let buf;
+    if (imgUrl.startsWith('/uploads/')) {
+      buf = fs.readFileSync(path.join(UPLOAD_DIR, path.basename(imgUrl)));
+    } else if (imgUrl.startsWith('/api/comfy/view')) {
+      // Fetch from ComfyUI
+      const parsed = new URL(imgUrl, 'http://localhost');
+      const params = parsed.searchParams;
+      const comfyParams = new URLSearchParams({
+        filename: params.get('filename'),
+        subfolder: params.get('subfolder') || '',
+        type: params.get('type') || 'output',
+      });
+      const comfyUrl = new URL(`${config.comfyUrl}/view?${comfyParams}`);
+      buf = await new Promise((resolve, reject) => {
+        http.get(comfyUrl, (resp) => {
+          const chunks = [];
+          resp.on('data', c => chunks.push(c));
+          resp.on('end', () => resolve(Buffer.concat(chunks)));
+          resp.on('error', reject);
+        }).on('error', reject);
+      });
+    } else if (imgUrl.startsWith('/api/gallery/dir/image')) {
+      const parsed = new URL(imgUrl, 'http://localhost');
+      const dir = parsed.searchParams.get('dir');
+      const filename = parsed.searchParams.get('filename');
+      buf = fs.readFileSync(path.resolve(dir, path.basename(filename)));
+    } else {
+      return res.status(400).json({ error: 'Unsupported image source' });
+    }
+
+    const base64 = buf.toString('base64');
+    res.json({ base64 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ── Start ────────────────────────────────────

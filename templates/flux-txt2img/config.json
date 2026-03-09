@@ -1,0 +1,83 @@
+{
+  "name": "Flux Text to Image (API)",
+  "description": "Generate images via Black Forest Labs Flux API — no local GPU needed",
+  "color": "#00d4aa",
+  "backend": "bfl",
+  "bfl_endpoint": "/v1/flux-pro-1.1",
+  "inputs": [
+    {
+      "name": "prompt",
+      "type": "prompt",
+      "label": "Prompt"
+    }
+  ],
+  "params": [
+    {
+      "name": "seed",
+      "label": "Seed",
+      "type": "seed",
+      "default": 42
+    },
+    {
+      "name": "width",
+      "label": "Width",
+      "type": "integer",
+      "min": 256,
+      "max": 1440,
+      "default": 1024
+    },
+    {
+      "name": "height",
+      "label": "Height",
+      "type": "integer",
+      "min": 256,
+      "max": 1440,
+      "default": 1024
+    },
+    {
+      "name": "steps",
+      "label": "Steps",
+      "type": "integer",
+      "min": 1,
+      "max": 50,
+      "default": 28
+    },
+    {
+      "name": "guidance",
+      "label": "Guidance",
+      "type": "slider",
+      "min": 1.5,
+      "max": 5,
+      "step": 0.1,
+      "default": 3.5
+    },
+    {
+      "name": "safety_tolerance",
+      "label": "Safety Tolerance",
+      "type": "select",
+      "options": ["0", "1", "2", "3", "4", "5", "6"],
+      "default": "2"
+    },
+    {
+      "name": "output_format",
+      "label": "Output Format",
+      "type": "select",
+      "options": ["png", "jpeg"],
+      "default": "png"
+    },
+    {
+      "name": "model",
+      "label": "Model",
+      "type": "select",
+      "options": [
+        "flux-pro-1.1",
+        "flux-pro-1.1-ultra",
+        "flux-pro",
+        "flux-dev",
+        "flux-2-pro-preview",
+        "flux-2-pro"
+      ],
+      "default": "flux-pro-1.1"
+    }
+  ]
+}

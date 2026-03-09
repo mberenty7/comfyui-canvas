@@ -2,7 +2,7 @@
 // Inputs (prompt, image) come from connected nodes — not from this node's properties
 
 class WorkflowNode {
-  constructor(id, { templateId, templateName, templateColor, inputs, params, workflow, label } = {}) {
+  constructor(id, { templateId, templateName, templateColor, inputs, params, workflow, label, backend, bflEndpoint } = {}) {
     this.id = id;
     this.type = 'workflow';
     this.templateId = templateId || '';
@@ -12,6 +12,8 @@ class WorkflowNode {
     this.templateParams = params || [];
     this.workflow = workflow || {};
     this.label = label || '';
+    this.backend = backend || 'comfy'; // 'comfy' or 'bfl'
+    this.bflEndpoint = bflEndpoint || '';
     this.paramValues = {};
     this.connectedInputs = {}; // inputName → { nodeId }
     this.fabricObject = null;
@@ -315,6 +317,8 @@ class WorkflowNode {
       paramValues: this.paramValues,
       connectedInputs: this.connectedInputs,
       label: this.label,
+      backend: this.backend,
+      bflEndpoint: this.bflEndpoint,
       x: this.fabricObject?.left || 0,
       y: this.fabricObject?.top || 0,
     };

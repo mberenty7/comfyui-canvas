@@ -1,0 +1,59 @@
+{
+  "name": "Flux Inpaint (API)",
+  "description": "Inpaint/outpaint via Black Forest Labs Flux Fill API",
+  "color": "#ff6b9d",
+  "backend": "bfl",
+  "bfl_endpoint": "/v1/flux-pro-1.0-fill",
+  "inputs": [
+    {
+      "name": "prompt",
+      "type": "prompt",
+      "label": "Prompt"
+    },
+    {
+      "name": "image",
+      "type": "image",
+      "label": "Image + Mask",
+      "uses_mask": true
+    }
+  ],
+  "params": [
+    {
+      "name": "seed",
+      "label": "Seed",
+      "type": "seed",
+      "default": 42
+    },
+    {
+      "name": "steps",
+      "label": "Steps",
+      "type": "integer",
+      "min": 1,
+      "max": 50,
+      "default": 50
+    },
+    {
+      "name": "guidance",
+      "label": "Guidance",
+      "type": "slider",
+      "min": 1,
+      "max": 100,
+      "step": 1,
+      "default": 30
+    },
+    {
+      "name": "safety_tolerance",
+      "label": "Safety Tolerance",
+      "type": "select",
+      "options": ["0", "1", "2", "3", "4", "5", "6"],
+      "default": "2"
+    },
+    {
+      "name": "output_format",
+      "label": "Output Format",
+      "type": "select",
+      "options": ["png", "jpeg"],
+      "default": "png"
+    }
+  ]
+}

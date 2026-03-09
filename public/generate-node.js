@@ -134,6 +134,11 @@ class GenerateNode {
     const workflowNode = engine.nodes.get(this.connectedWorkflow.nodeId);
     if (!workflowNode || workflowNode.type !== 'workflow') throw new Error('Connected node is not a workflow');
 
+    // Check if this is a BFL (Flux API) backend
+    if (workflowNode.backend === 'bfl') {
+      return this._runBfl(engine, workflowNode);
+    }
+
     this.isRunning = true;
     this.setBorderState('running');
     const seeds = this.getSeeds();
@@ -181,7 +186,6 @@ class GenerateNode {
 
         // Poll for result
         const result = await this._pollResult(data.prompt_id);
-        if (window.addLog) window.addLog(`Poll result keys: ${result ? Object.keys(result).join(',') : 'null'}, outputs: ${result ? JSON.stringify(Object.keys(result.outputs || {})) : 'none'}`, 'info');
         if (result) {
           const outputs = result.outputs || {};
           for (const nodeKey of Object.keys(outputs)) {
@@ -218,6 +222,148 @@ class GenerateNode {
     this.setStatus(`Done — ${results.length} image${results.length !== 1 ? 's' : ''}`);
     this.setBorderState('done');
     return results;
+  }
+
+  // Run generation via BFL (Flux) API
+  async _runBfl(engine, workflowNode) {
+    this.isRunning = true;
+    this.setBorderState('running');
+    const seeds = this.getSeeds();
+    const results = [];
+
+    for (let i = 0; i < seeds.length; i++) {
+      this.setStatus(`BFL ${i + 1}/${seeds.length}...`);
+
+      try {
+        // Gather prompt from connected prompt node
+        let promptText = '';
+        for (const [inputName, conn] of Object.entries(workflowNode.connectedInputs || {})) {
+          const input = workflowNode.templateInputs.find(inp => inp.name === inputName);
+          if (!input) continue;
+          const sourceNode = engine.nodes.get(conn.nodeId);
+          if (input.type === 'prompt' && sourceNode?.type === 'prompt') {
+            promptText = sourceNode.positive || '';
+          }
+        }
+
+        // Build params from workflow node values
+        const params = { ...workflowNode.paramValues };
+        params.seed = seeds[i];
+
+        // Determine endpoint — model selector overrides default
+        let endpoint = workflowNode.bflEndpoint || '/v1/flux-pro-1.1';
+        if (params.model) {
+          endpoint = `/v1/${params.model}`;
+          delete params.model;
+        }
+
+        // Handle image+mask for inpainting
+        let imageBase64 = null;
+        let maskBase64 = null;
+
+        for (const [inputName, conn] of Object.entries(workflowNode.connectedInputs || {})) {
+          const input = workflowNode.templateInputs.find(inp => inp.name === inputName);
+          if (!input || input.type !== 'image') continue;
+          const sourceNode = engine.nodes.get(conn.nodeId);
+          if (!sourceNode?.type === 'image') continue;
+
+          // Get image as base64 via server
+          const imgUrl = sourceNode.imageUrl || sourceNode.comfyName;
+          if (imgUrl) {
+            this.setStatus(`BFL ${i + 1}/${seeds.length} encoding...`);
+            const b64Resp = await fetch(`/api/image-base64?url=${encodeURIComponent(imgUrl)}`);
+            const b64Data = await b64Resp.json();
+            if (b64Data.base64) imageBase64 = b64Data.base64;
+          }
+
+          // Get mask if available
+          if (input.uses_mask && sourceNode.maskUrl) {
+            const maskResp = await fetch(`/api/image-base64?url=${encodeURIComponent(sourceNode.maskUrl)}`);
+            const maskData = await maskResp.json();
+            if (maskData.base64) maskBase64 = maskData.base64;
+          }
+        }
+
+        if (window.addLog) window.addLog(`[BFL] Submitting to ${endpoint}, seed=${seeds[i]}`, 'info');
+
+        // Submit to BFL
+        const resp = await fetch('/api/bfl/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            endpoint,
+            prompt: promptText,
+            params,
+            image: imageBase64,
+            mask: maskBase64,
+          }),
+        });
+        const data = await resp.json();
+
+        if (data.error) throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
+        if (!data.id) throw new Error('No request ID returned from BFL');
+
+        if (window.addLog) window.addLog(`[BFL] Request submitted: ${data.id}`, 'info');
+
+        // Poll for result
+        this.setStatus(`BFL ${i + 1}/${seeds.length} generating...`);
+        const result = await this._pollBflResult(data.id, data.polling_url);
+
+        if (result.status === 'Ready' && result.result?.sample) {
+          const bflImageUrl = result.result.sample;
+          const ext = (params.output_format === 'jpeg') ? 'jpg' : 'png';
+          const filename = `${this.outputName}_${seeds[i]}.${ext}`;
+
+          // Download and save via server
+          const metadata = this._buildMetadata(workflowNode, engine, seeds[i]);
+          metadata.backend = 'bfl';
+          metadata.bfl_endpoint = endpoint;
+          metadata.bfl_request_id = data.id;
+
+          const saveResp = await fetch('/api/bfl/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageUrl: bflImageUrl, filename, metadata }),
+          });
+          const saveData = await saveResp.json();
+
+          if (saveData.saved) {
+            results.push({ imageUrl: saveData.path, comfyName: filename, seed: seeds[i] });
+            if (window.addLog) window.addLog(`[BFL] Image saved: ${filename}`, 'success');
+          }
+        } else {
+          throw new Error(`BFL generation failed: ${result.status || 'unknown'}`);
+        }
+      } catch (err) {
+        console.error(`BFL generation ${i + 1} failed:`, err);
+        if (window.addLog) window.addLog(`[BFL] Error: ${err.message}`, 'error');
+        this.setStatus(`Error: ${err.message}`);
+        this.setBorderState('error');
+      }
+    }
+
+    this.isRunning = false;
+    this.setStatus(`Done — ${results.length} image${results.length !== 1 ? 's' : ''}`);
+    this.setBorderState('done');
+    return results;
+  }
+
+  async _pollBflResult(requestId, pollingUrl) {
+    const maxWait = 300000;
+    const start = Date.now();
+    while (Date.now() - start < maxWait) {
+      const resp = await fetch(`/api/bfl/result/${requestId}`);
+      const data = await resp.json();
+
+      if (data.status === 'Ready') return data;
+      if (data.status === 'Error' || data.status === 'Request Moderated') {
+        throw new Error(`BFL: ${data.status} — ${data.result?.message || 'generation failed'}`);
+      }
+
+      // Still pending/processing
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    throw new Error('BFL generation timed out (5 min)');
   }
 
   _buildMetadata(workflowNode, engine, seed) {

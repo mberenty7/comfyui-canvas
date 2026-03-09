@@ -161,12 +161,14 @@ async function openSettings() {
   const dirInput = document.getElementById('settings-output-dir');
 
   const apiKeyInput = document.getElementById('settings-api-key');
+  const bflKeyInput = document.getElementById('settings-bfl-key');
 
   const resp = await fetch('/api/config');
   const config = await resp.json();
   urlInput.value = config.comfyUrl || '';
   dirInput.value = config.outputDir || '';
   apiKeyInput.value = config.comfyApiKey || '';
+  bflKeyInput.value = config.bflApiKey || '';
 
   modal.classList.remove('hidden');
 
@@ -174,7 +176,7 @@ async function openSettings() {
     await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ comfyUrl: urlInput.value, outputDir: dirInput.value, comfyApiKey: apiKeyInput.value }),
+      body: JSON.stringify({ comfyUrl: urlInput.value, outputDir: dirInput.value, comfyApiKey: apiKeyInput.value, bflApiKey: bflKeyInput.value }),
     });
     modal.classList.add('hidden');
     checkComfyStatus();
@@ -544,6 +546,8 @@ async function addWorkflowNode() {
         inputs: template.inputs,
         params: template.params,
         workflow: template.workflow,
+        backend: template.backend || 'comfy',
+        bflEndpoint: template.bfl_endpoint || '',
       });
       node.createVisual(pos.x - 90, pos.y - 35);
       engine.register(node);

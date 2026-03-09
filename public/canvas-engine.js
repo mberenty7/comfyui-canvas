@@ -240,6 +240,7 @@ class CanvasEngine {
           templateId: n.templateId, templateName: n.templateName,
           templateColor: n.templateColor, inputs: n.inputs,
           params: n.params, workflow: n.workflow, label: n.label,
+          backend: n.backend, bflEndpoint: n.bflEndpoint,
         });
         if (n.paramValues) node.paramValues = n.paramValues;
         if (n.connectedInputs) node.connectedInputs = n.connectedInputs;
