@@ -519,6 +519,31 @@ app.get('/api/gallery/dir/image', (req, res) => {
   res.sendFile(resolved);
 });
 
+// ── 3D Mesh Proxy ────────────────────────────
+// Proxy mesh files from ComfyUI output/mesh/ directory
+app.get('/api/comfy/mesh', async (req, res) => {
+  try {
+    const filename = req.query.filename;
+    if (!filename) return res.status(400).json({ error: 'filename required' });
+    // Sanitize filename
+    const safe = path.basename(filename);
+    const params = new URLSearchParams({ filename: safe, subfolder: 'mesh', type: 'output' });
+    const result = await proxyRequest('GET', '/view?' + params.toString());
+    if (result.status !== 200) return res.status(result.status).json({ error: 'Failed to fetch mesh from ComfyUI' });
+    const ext = path.extname(safe).toLowerCase();
+    const mimeTypes = { '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.obj': 'text/plain', '.fbx': 'application/octet-stream' };
+    res.set('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+    res.set('Content-Disposition', 'inline; filename= + safe + ');
+    if (Buffer.isBuffer(result.data)) {
+      res.send(result.data);
+    } else {
+      res.send(Buffer.from(JSON.stringify(result.data)));
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── BFL (Flux) API ───────────────────────────
 
 function bflRequest(method, urlPath, body) {

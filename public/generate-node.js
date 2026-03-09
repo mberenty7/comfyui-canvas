@@ -209,6 +209,16 @@ class GenerateNode {
                 }).catch(err => console.warn('Failed to save output:', err));
               }
             }
+            // Handle 3D mesh outputs (e.g. Hunyuan3D Preview3D node)
+            if (nodeOutput.result && Array.isArray(nodeOutput.result)) {
+              for (const item of nodeOutput.result) {
+                if (typeof item === 'string' && /\.(glb|gltf|obj|fbx)$/i.test(item)) {
+                  const meshUrl = `/api/comfy/mesh?filename=${encodeURIComponent(item)}`;
+                  results.push({ meshUrl, meshFilename: item, seed: seeds[i], type: '3d' });
+                  if (window.addLog) window.addLog(`3D model output: ${item}`, 'success');
+                }
+              }
+            }
           }
         }
       } catch (err) {

@@ -651,6 +651,14 @@ async function runGenerate(genNode) {
     let y = genObj.top;
 
     for (const result of results) {
+      // Handle 3D mesh outputs — open in viewer
+      if (result.type === '3d' && result.meshUrl) {
+        addLog(`Opening 3D model in viewer: ${result.meshFilename}`, 'success');
+        if (window._viewer3d) {
+          window._viewer3d.open(result.meshUrl, result.meshFilename);
+        }
+        continue;
+      }
       const dims = await getImageDimensions(result.imageUrl);
       const id = engine.nextId();
       const imgNode = new ImageNode(id, {

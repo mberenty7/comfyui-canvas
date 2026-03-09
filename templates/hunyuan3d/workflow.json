@@ -1,0 +1,26 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": ""
+    }
+  },
+  "2": {
+    "class_type": "TencentImageToModelNode",
+    "inputs": {
+      "model": "3.0",
+      "face_count": 500000,
+      "generate_type": "Normal",
+      "generate_type.pbr": true,
+      "seed": 42,
+      "image": ["1", 0]
+    }
+  },
+  "11": {
+    "class_type": "Preview3D",
+    "inputs": {
+      "model_file": ["2", 0],
+      "image": ""
+    }
+  }
+}
