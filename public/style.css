@@ -801,3 +801,99 @@ body {
 
 .viewer3d-pill:hover { transform: scale(1.05); }
 .viewer3d-pill.hidden { display: none; }
+
+/* ── Mask Editor Modal ───────────────────────── */
+
+.mask-editor-modal {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.9);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mask-editor-modal.hidden { display: none; }
+
+.mask-editor-container {
+  width: 90vw;
+  max-height: 95vh;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mask-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: #0f1a2e;
+  flex-wrap: wrap;
+}
+
+.mask-editor-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e94560;
+}
+
+.mask-editor-tools {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex: 1;
+}
+
+.mask-tool {
+  background: #0f3460;
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mask-tool:hover { background: #1a4480; }
+.mask-tool.active { background: #e94560; border-color: #e94560; }
+
+.mask-brush-size {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.mask-brush-size input[type="range"] {
+  width: 100px;
+  accent-color: #e94560;
+}
+
+.mask-editor-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.mask-editor-viewport {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.mask-editor-viewport .canvas-container {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}

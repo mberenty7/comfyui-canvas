@@ -1,7 +1,7 @@
 // ImageNode — an image on the canvas with an output port
 
 class ImageNode {
-  constructor(id, { imageUrl, filename, width, height, fileSize, format, comfyName, label }) {
+  constructor(id, { imageUrl, filename, width, height, fileSize, format, comfyName, label, maskDataUrl, maskComfyName }) {
     this.id = id;
     this.type = 'image';
     this.imageUrl = imageUrl;
@@ -12,6 +12,8 @@ class ImageNode {
     this.fileSize = fileSize;
     this.format = format;
     this.label = label || '';
+    this.maskDataUrl = maskDataUrl || null;
+    this.maskComfyName = maskComfyName || null;
     this.fabricObject = null;
   }
 
@@ -96,6 +98,42 @@ class ImageNode {
     if (labelInput) {
       labelInput.addEventListener('input', () => this.updateLabel(labelInput.value));
     }
+
+    document.getElementById('btn-paint-mask')?.addEventListener('click', () => {
+      if (window._maskEditor) {
+        window._maskEditor.open(
+          this.imageUrl,
+          this.width || 512,
+          this.height || 512,
+          this.maskDataUrl,
+          async (maskDataUrl) => {
+            this.maskDataUrl = maskDataUrl;
+            // Upload mask to ComfyUI
+            try {
+              const resp = await fetch(maskDataUrl);
+              const blob = await resp.blob();
+              const file = new File([blob], `mask_${this.id}.png`, { type: 'image/png' });
+              const formData = new FormData();
+              formData.append('image', file);
+              const uploadResp = await fetch('/api/comfy/upload', { method: 'POST', body: formData });
+              const result = await uploadResp.json();
+              if (result.comfyName) this.maskComfyName = result.comfyName;
+              if (window.addLog) window.addLog(`Mask saved for "${this.filename}"`, 'success');
+            } catch (err) {
+              console.warn('Failed to upload mask:', err);
+            }
+            // Refresh properties panel
+            if (window._refreshProperties) window._refreshProperties(this);
+          }
+        );
+      }
+    });
+
+    document.getElementById('btn-clear-mask')?.addEventListener('click', () => {
+      this.maskDataUrl = null;
+      this.maskComfyName = null;
+      if (window._refreshProperties) window._refreshProperties(this);
+    });
   }
 
   updateLabel(text) {
@@ -121,6 +159,7 @@ class ImageNode {
       fileSize: this.fileSize,
       format: this.format,
       label: this.label,
+      maskComfyName: this.maskComfyName,
       x: this.fabricObject?.left || 0,
       y: this.fabricObject?.top || 0,
     };
@@ -159,6 +198,14 @@ class ImageNode {
       <div class="prop-row">
         <span class="prop-label">ComfyUI Name</span>
         <span class="prop-value">${this.comfyName}</span>
+      </div>
+      <div class="prop-section" style="margin-top:12px">
+        <label class="prop-section-label">🎨 Inpaint Mask</label>
+        ${this.maskDataUrl ? '<img class="prop-preview" src="' + this.maskDataUrl + '" alt="Mask" style="border:1px solid #333">' : ''}
+        <div class="prop-actions">
+          <button id="btn-paint-mask" class="prop-btn" style="background:#e94560;border-color:#e94560">${this.maskDataUrl ? '🎨 Edit Mask' : '🎨 Paint Mask'}</button>
+          ${this.maskDataUrl ? '<button id="btn-clear-mask" class="prop-btn">🗑 Clear</button>' : ''}
+        </div>
       </div>
     `;
   }

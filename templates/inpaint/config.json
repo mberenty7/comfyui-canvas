@@ -1,0 +1,75 @@
+{
+  "name": "Inpaint",
+  "description": "Inpaint masked regions of an image with SDXL",
+  "color": "#e94560",
+  "inputs": [
+    {
+      "name": "prompt",
+      "type": "prompt",
+      "label": "Prompt",
+      "target_positive": { "node": "2", "field": "text" },
+      "target_negative": { "node": "3", "field": "text" }
+    },
+    {
+      "name": "image",
+      "type": "image",
+      "label": "Image + Mask",
+      "target_node": "4",
+      "target_field": "image",
+      "mask_target_node": "4",
+      "mask_target_field": "image",
+      "uses_mask": true
+    }
+  ],
+  "params": [
+    {
+      "name": "ckpt_name",
+      "label": "Checkpoint",
+      "type": "select",
+      "options": ["newrealityxl_pro.safetensors", "sd_xl_base_1.0.safetensors"],
+      "default": "newrealityxl_pro.safetensors",
+      "target_node": "1",
+      "target_field": "ckpt_name"
+    },
+    {
+      "name": "steps",
+      "label": "Steps",
+      "type": "integer",
+      "default": 25,
+      "min": 1,
+      "max": 100,
+      "target_node": "6",
+      "target_field": "steps"
+    },
+    {
+      "name": "cfg",
+      "label": "CFG Scale",
+      "type": "slider",
+      "default": 7,
+      "min": 1,
+      "max": 20,
+      "step": 0.5,
+      "target_node": "6",
+      "target_field": "cfg"
+    },
+    {
+      "name": "denoise",
+      "label": "Denoise Strength",
+      "type": "slider",
+      "default": 0.75,
+      "min": 0,
+      "max": 1,
+      "step": 0.05,
+      "target_node": "6",
+      "target_field": "denoise"
+    },
+    {
+      "name": "seed",
+      "label": "Seed",
+      "type": "seed",
+      "default": 42,
+      "target_node": "6",
+      "target_field": "seed"
+    }
+  ]
+}

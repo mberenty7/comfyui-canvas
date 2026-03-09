@@ -223,6 +223,7 @@ class CanvasEngine {
           imageUrl: n.imageUrl, filename: n.filename, comfyName: n.comfyName,
           width: n.width || 0, height: n.height || 0,
           fileSize: n.fileSize || 0, format: n.format || '', label: n.label,
+          maskComfyName: n.maskComfyName,
         });
         await node.createVisual(n.x, n.y);
         this.register(node);

@@ -152,6 +152,25 @@ class WorkflowNode {
           const node = wf[input.target_node];
           if (node) node.inputs[input.target_field || 'image'] = sourceNode.comfyName;
         }
+        // If this input uses a mask and the image has one, wire it up
+        // The LoadImage node outputs [IMAGE, MASK] — mask is output index 1
+        // VAEEncodeForInpaint expects mask from the LoadImage node
+        if (input.uses_mask && sourceNode.maskComfyName) {
+          // The mask is loaded from the same LoadImage node's second output (index 1)
+          // But we need to load the mask separately since it's a different image
+          // Add a separate LoadImage node for the mask
+          const maskNodeId = input.target_node + '_mask';
+          wf[maskNodeId] = {
+            class_type: 'LoadImage',
+            inputs: { image: sourceNode.maskComfyName },
+          };
+          // Find the VAEEncodeForInpaint node and wire the mask
+          for (const nodeKey of Object.keys(wf)) {
+            if (wf[nodeKey].class_type === 'VAEEncodeForInpaint') {
+              wf[nodeKey].inputs.mask = [maskNodeId, 1];
+            }
+          }
+        }
         // If this input has a link_output, wire the loader's output to the target node
         if (input.link_output) {
           const lo = input.link_output;

@@ -62,6 +62,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (node.bindProperties) node.bindProperties();
   };
 
+  // Mask Editor
+  window._maskEditor = new MaskEditor();
+
   // 3D Viewer
   window._viewer3d = new Viewer3D();
 
