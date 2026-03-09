@@ -235,7 +235,7 @@ class GenerateNode {
       this.setStatus(`BFL ${i + 1}/${seeds.length}...`);
 
       try {
-        // Gather prompt from connected prompt node
+        // Gather prompt from connected prompt node (or inpaint node)
         let promptText = '';
         for (const [inputName, conn] of Object.entries(workflowNode.connectedInputs || {})) {
           const input = workflowNode.templateInputs.find(inp => inp.name === inputName);
@@ -243,6 +243,11 @@ class GenerateNode {
           const sourceNode = engine.nodes.get(conn.nodeId);
           if (input.type === 'prompt' && sourceNode?.type === 'prompt') {
             promptText = sourceNode.positive || '';
+          }
+          // InpaintNode as source — get prompt from its connected prompt node
+          if (sourceNode?.type === 'inpaint') {
+            const promptData = sourceNode.getPromptData(engine);
+            if (promptData?.positive) promptText = promptData.positive;
           }
         }
 
@@ -265,10 +270,22 @@ class GenerateNode {
           const input = workflowNode.templateInputs.find(inp => inp.name === inputName);
           if (!input || input.type !== 'image') continue;
           const sourceNode = engine.nodes.get(conn.nodeId);
-          if (!sourceNode?.type === 'image') continue;
+          if (!sourceNode) continue;
+
+          let imgUrl = null;
+          let maskUrl = null;
+
+          if (sourceNode.type === 'inpaint') {
+            // InpaintNode — get image and mask from its connections
+            const imgData = sourceNode.getImageData(engine);
+            if (imgData?.imageUrl) imgUrl = imgData.imageUrl;
+            if (imgData?.maskUrl) maskUrl = imgData.maskUrl;
+          } else if (sourceNode.type === 'image') {
+            imgUrl = sourceNode.imageUrl || sourceNode.comfyName;
+            if (input.uses_mask && sourceNode.maskUrl) maskUrl = sourceNode.maskUrl;
+          }
 
           // Get image as base64 via server
-          const imgUrl = sourceNode.imageUrl || sourceNode.comfyName;
           if (imgUrl) {
             this.setStatus(`BFL ${i + 1}/${seeds.length} encoding...`);
             const b64Resp = await fetch(`/api/image-base64?url=${encodeURIComponent(imgUrl)}`);
@@ -276,9 +293,9 @@ class GenerateNode {
             if (b64Data.base64) imageBase64 = b64Data.base64;
           }
 
-          // Get mask if available
-          if (input.uses_mask && sourceNode.maskUrl) {
-            const maskResp = await fetch(`/api/image-base64?url=${encodeURIComponent(sourceNode.maskUrl)}`);
+          // Get mask as base64
+          if (maskUrl) {
+            const maskResp = await fetch(`/api/image-base64?url=${encodeURIComponent(maskUrl)}`);
             const maskData = await maskResp.json();
             if (maskData.base64) maskBase64 = maskData.base64;
           }

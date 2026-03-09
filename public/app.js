@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
   addMenu.querySelector('[data-action="image"]').addEventListener('click', () => { addMenu.classList.add('hidden'); importImage(); });
   addMenu.querySelector('[data-action="prompt"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addPromptNode(); });
   addMenu.querySelector('[data-action="workflow"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addWorkflowNode(); });
+  addMenu.querySelector('[data-action="inpaint"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addInpaintNode(); });
   addMenu.querySelector('[data-action="model"]').addEventListener('click', () => { addMenu.classList.add('hidden'); importModel(); });
   addMenu.querySelector('[data-action="viewer"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addViewerNode(); });
   addMenu.querySelector('[data-action="generate"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addGenerateNode(); });
@@ -345,12 +346,32 @@ function handleConnect(sourceNode) {
     targetNode._updateStatus(sourceNode.filename || 'Model');
     connected = true;
   } else if (mode.expects === 'prompt' && sourceNode.type === 'prompt') {
-    // Workflow node → prompt input
-    targetNode.connectInput(mode.inputName, sourceNode.id);
+    // Workflow or Inpaint node → prompt input
+    if (targetNode.type === 'inpaint' && mode.connectType === 'prompt') {
+      targetNode.connectedPrompt = { nodeId: sourceNode.id };
+    } else if (targetNode.connectInput) {
+      targetNode.connectInput(mode.inputName, sourceNode.id);
+    }
     connected = true;
-  } else if (mode.expects === 'image' && (sourceNode.type === 'image' || sourceNode.type === 'model')) {
-    // Workflow node → image input (images or 3D model captures)
-    targetNode.connectInput(mode.inputName, sourceNode.id);
+  } else if (mode.expects === 'image' && sourceNode.type === 'image') {
+    // Workflow or Inpaint node → image input
+    if (targetNode.type === 'inpaint' && mode.connectType === 'image') {
+      targetNode.connectedImage = { nodeId: sourceNode.id };
+    } else if (targetNode.connectInput) {
+      targetNode.connectInput(mode.inputName, sourceNode.id);
+    }
+    connected = true;
+  } else if (mode.expects === 'image' && sourceNode.type === 'inpaint') {
+    // Workflow node → inpaint node as image+mask+prompt source
+    if (targetNode.connectInput) {
+      targetNode.connectInput(mode.inputName, sourceNode.id);
+    }
+    connected = true;
+  } else if (mode.expects === 'image' && sourceNode.type === 'model') {
+    // Workflow node → 3D model captures
+    if (targetNode.connectInput) {
+      targetNode.connectInput(mode.inputName, sourceNode.id);
+    }
     connected = true;
   }
 
@@ -430,6 +451,7 @@ function openQuickAdd() {
       if (action === 'image') importImage();
       else if (action === 'prompt') addPromptNode();
       else if (action === 'workflow') addWorkflowNode();
+      else if (action === 'inpaint') addInpaintNode();
       else if (action === 'model') importModel();
       else if (action === 'viewer') addViewerNode();
       else if (action === 'generate') addGenerateNode();
@@ -560,6 +582,14 @@ function addViewerNode() {
   const id = engine.nextId();
   const node = new ViewerNode(id);
   node.createVisual(pos.x - 90, pos.y - 35);
+  engine.register(node);
+}
+
+function addInpaintNode() {
+  const pos = engine.canvasCenter();
+  const id = engine.nextId();
+  const node = new InpaintNode(id);
+  node.createVisual(pos.x - 80, pos.y - 40);
   engine.register(node);
 }
 

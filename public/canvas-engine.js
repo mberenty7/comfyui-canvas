@@ -262,6 +262,15 @@ class CanvasEngine {
         node.createVisual(n.x, n.y);
         this.register(node);
 
+      } else if (n.type === 'inpaint') {
+        const node = new InpaintNode(n.id, {
+          label: n.label, maskComfyName: n.maskComfyName,
+        });
+        if (n.connectedImage) node.connectedImage = n.connectedImage;
+        if (n.connectedPrompt) node.connectedPrompt = n.connectedPrompt;
+        node.createVisual(n.x, n.y);
+        this.register(node);
+
       } else if (n.type === 'generate') {
         const node = new GenerateNode(n.id, {
           count: n.count, seedMode: n.seedMode, baseSeed: n.baseSeed,

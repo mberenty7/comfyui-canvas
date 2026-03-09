@@ -138,6 +138,54 @@ class WorkflowNode {
       const sourceNode = engine.nodes.get(conn.nodeId);
       if (!sourceNode) continue;
 
+      // InpaintNode as source — provides image+mask+prompt
+      if (sourceNode.type === 'inpaint') {
+        const imgData = sourceNode.getImageData(engine);
+        const promptData = sourceNode.getPromptData(engine);
+
+        if (input.type === 'image' && imgData) {
+          if (input.target_node) {
+            const node = wf[input.target_node];
+            if (node) node.inputs[input.target_field || 'image'] = imgData.comfyName;
+          }
+          // Wire mask
+          if (input.uses_mask && imgData.maskComfyName) {
+            const maskNodeId = input.target_node + '_mask';
+            wf[maskNodeId] = {
+              class_type: 'LoadImage',
+              inputs: { image: imgData.maskComfyName },
+            };
+            for (const nodeKey of Object.keys(wf)) {
+              if (wf[nodeKey].class_type === 'VAEEncodeForInpaint') {
+                wf[nodeKey].inputs.mask = [maskNodeId, 1];
+              }
+            }
+          }
+          if (input.link_output) {
+            const lo = input.link_output;
+            const targetNode = wf[lo.to_node];
+            if (targetNode) targetNode.inputs[lo.to_field] = [lo.from_node, lo.from_output];
+          }
+        }
+
+        // Also wire prompt from inpaint node if this input is for prompt or if there's a prompt input
+        if (promptData) {
+          const promptInput = this.templateInputs.find(i => i.type === 'prompt');
+          if (promptInput && !this.connectedInputs[promptInput.name]) {
+            // Auto-wire prompt from inpaint node if no explicit prompt connection
+            if (promptInput.target_positive) {
+              const node = wf[promptInput.target_positive.node];
+              if (node) node.inputs[promptInput.target_positive.field] = promptData.positive;
+            }
+            if (promptInput.target_negative) {
+              const node = wf[promptInput.target_negative.node];
+              if (node) node.inputs[promptInput.target_negative.field] = promptData.negative;
+            }
+          }
+        }
+        continue;
+      }
+
       if (input.type === 'prompt' && sourceNode.type === 'prompt') {
         // Wire positive and negative prompt text into the workflow
         if (input.target_positive) {
