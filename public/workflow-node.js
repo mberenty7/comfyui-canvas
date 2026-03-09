@@ -189,6 +189,7 @@ class WorkflowNode {
           <div class="workflow-input-slot" data-input="${input.name}" data-expects="${expectedType}">
             ${conn ? `✅ Connected` : `Click to connect a ${input.type} node`}
           </div>
+          ${conn ? `<button class="prop-btn disconnect-btn" data-disconnect="${input.name}" style="margin-top:4px;font-size:11px;padding:4px 8px;width:100%">✂️ Disconnect</button>` : ''}
         </div>
       `;
     }
@@ -263,6 +264,21 @@ class WorkflowNode {
         const expects = el.dataset.expects;
         window._connectMode = { targetNodeId: this.id, inputName, expects };
         el.textContent = `🔗 Click a ${expects} node on the canvas...`;
+      });
+    });
+
+    // Disconnect buttons
+    document.querySelectorAll('.disconnect-btn').forEach(el => {
+      el.addEventListener('click', () => {
+        const inputName = el.dataset.disconnect;
+        const oldConn = this.connectedInputs[inputName];
+        delete this.connectedInputs[inputName];
+        // Remove visual connection
+        if (oldConn && window._engine) {
+          window._engine.removeConnectionBetween(oldConn.nodeId, this.id);
+        }
+        // Re-render properties
+        if (window._refreshProperties) window._refreshProperties(this);
       });
     });
   }

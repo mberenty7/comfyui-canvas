@@ -110,6 +110,17 @@ class ViewerNode {
       });
     }
 
+    // Disconnect model
+    document.querySelector('.disconnect-viewer-btn')?.addEventListener('click', () => {
+      const oldConn = this.connectedModel;
+      this.connectedModel = null;
+      this._updateStatus('No model connected');
+      if (oldConn && window._engine) {
+        window._engine.removeConnectionBetween(oldConn.nodeId, this.id);
+      }
+      if (window._refreshProperties) window._refreshProperties(this);
+    });
+
     // Open viewer button
     const openBtn = document.getElementById('open-viewer-btn');
     if (openBtn) {
@@ -138,6 +149,7 @@ class ViewerNode {
         <div class="workflow-input-slot" id="viewer-model-slot" style="cursor:pointer">
           ${hasModel ? '✅ Connected' : 'Click to connect a 3D Model node'}
         </div>
+        ${hasModel ? `<button class="prop-btn disconnect-viewer-btn" style="margin-top:4px;font-size:11px;padding:4px 8px;width:100%">✂️ Disconnect</button>` : ''}
       </div>
       <div class="prop-section">
         <button id="open-viewer-btn" class="generate-btn" style="background:#e94560" ${hasModel ? '' : 'disabled'}>👁 Open Viewer</button>

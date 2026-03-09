@@ -301,6 +301,7 @@ class GenerateNode {
         <div class="workflow-input-slot" data-connect="workflow" style="cursor:pointer">
           ${workflowStatus}
         </div>
+        ${this.connectedWorkflow ? `<button class="prop-btn disconnect-workflow-btn" style="margin-top:4px;font-size:11px;padding:4px 8px;width:100%">✂️ Disconnect</button>` : ''}
       </div>
       <div class="prop-section">
         <label class="prop-section-label">Number of Generations</label>
@@ -354,6 +355,16 @@ class GenerateNode {
     document.querySelector('[data-connect="workflow"]')?.addEventListener('click', () => {
       window._connectMode = { targetNodeId: this.id, connectType: 'workflow', expects: 'workflow' };
       document.querySelector('[data-connect="workflow"]').textContent = '🔗 Click a workflow node...';
+    });
+
+    // Disconnect workflow
+    document.querySelector('.disconnect-workflow-btn')?.addEventListener('click', () => {
+      const oldConn = this.connectedWorkflow;
+      this.connectedWorkflow = null;
+      if (oldConn && window._engine) {
+        window._engine.removeConnectionBetween(oldConn.nodeId, this.id);
+      }
+      if (window._refreshProperties) window._refreshProperties(this);
     });
 
     // Generate button

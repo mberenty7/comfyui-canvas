@@ -55,6 +55,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // Generate callback
   window._onGenerate = runGenerate;
 
+  // Expose engine for disconnect handlers
+  window._engine = engine;
+  window._refreshProperties = (node) => {
+    showProperties(node);
+    if (node.bindProperties) node.bindProperties();
+  };
+
   // 3D Viewer
   window._viewer3d = new Viewer3D();
 

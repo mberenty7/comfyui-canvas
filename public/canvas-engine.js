@@ -146,6 +146,11 @@ class CanvasEngine {
     this._drawConnections();
   }
 
+  removeConnectionBetween(fromId, toId) {
+    this.connections = this.connections.filter(c => !(c.fromId === fromId && c.toId === toId));
+    this._drawConnections();
+  }
+
   _drawConnections() {
     // Remove old lines
     const old = this.fc.getObjects().filter(o => o._isConnection);
