@@ -267,7 +267,6 @@ class CanvasEngine {
           label: n.label, maskComfyName: n.maskComfyName,
         });
         if (n.connectedImage) node.connectedImage = n.connectedImage;
-        if (n.connectedPrompt) node.connectedPrompt = n.connectedPrompt;
         node.createVisual(n.x, n.y);
         this.register(node);
 

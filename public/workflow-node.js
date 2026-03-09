@@ -168,21 +168,6 @@ class WorkflowNode {
           }
         }
 
-        // Also wire prompt from inpaint node if this input is for prompt or if there's a prompt input
-        if (promptData) {
-          const promptInput = this.templateInputs.find(i => i.type === 'prompt');
-          if (promptInput && !this.connectedInputs[promptInput.name]) {
-            // Auto-wire prompt from inpaint node if no explicit prompt connection
-            if (promptInput.target_positive) {
-              const node = wf[promptInput.target_positive.node];
-              if (node) node.inputs[promptInput.target_positive.field] = promptData.positive;
-            }
-            if (promptInput.target_negative) {
-              const node = wf[promptInput.target_negative.node];
-              if (node) node.inputs[promptInput.target_negative.field] = promptData.negative;
-            }
-          }
-        }
         continue;
       }
 

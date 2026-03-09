@@ -244,11 +244,7 @@ class GenerateNode {
           if (input.type === 'prompt' && sourceNode?.type === 'prompt') {
             promptText = sourceNode.positive || '';
           }
-          // InpaintNode as source — get prompt from its connected prompt node
-          if (sourceNode?.type === 'inpaint') {
-            const promptData = sourceNode.getPromptData(engine);
-            if (promptData?.positive) promptText = promptData.positive;
-          }
+
         }
 
         // Build params from workflow node values

@@ -11,13 +11,12 @@ class InpaintNode {
     this.maskDataUrl = maskDataUrl || null;
     this.maskComfyName = maskComfyName || null;
     this.connectedImage = null;  // { nodeId }
-    this.connectedPrompt = null; // { nodeId }
     this.fabricObject = null;
   }
 
   createVisual(x, y) {
     const width = 160;
-    const height = 80;
+    const height = 60;
 
     const bg = new fabric.Rect({
       width, height,
@@ -49,36 +48,13 @@ class InpaintNode {
       left: 8, top: 22,
     });
 
-    // Input port: image (top-left)
+    // Input port: image (left)
     const imgPort = new fabric.Circle({
       radius: 5,
       fill: '#4a9eff',
       stroke: '#fff',
       strokeWidth: 1.5,
-      left: -5, top: 20,
-    });
-
-    const imgLabel = new fabric.Text('img', {
-      fontSize: 8,
-      fill: '#666',
-      fontFamily: 'monospace',
-      left: 10, top: 18,
-    });
-
-    // Input port: prompt (bottom-left)
-    const promptPort = new fabric.Circle({
-      radius: 5,
-      fill: '#a855f7',
-      stroke: '#fff',
-      strokeWidth: 1.5,
-      left: -5, top: 44,
-    });
-
-    const promptLabel = new fabric.Text('prompt', {
-      fontSize: 8,
-      fill: '#666',
-      fontFamily: 'monospace',
-      left: 10, top: 42,
+      left: -5, top: height / 2 - 5,
     });
 
     // Output port on right
@@ -91,7 +67,7 @@ class InpaintNode {
     });
 
     const group = new fabric.Group(
-      [bg, typeLabel, userLabel, statusText, imgPort, imgLabel, promptPort, promptLabel, outPort],
+      [bg, typeLabel, userLabel, statusText, imgPort, outPort],
       { left: x, top: y, hasControls: false, hasBorders: false }
     );
 
@@ -128,20 +104,8 @@ class InpaintNode {
     };
   }
 
-  // Get the connected prompt node's data
-  getPromptData(engine) {
-    if (!this.connectedPrompt) return null;
-    const promptNode = engine.nodes.get(this.connectedPrompt.nodeId);
-    if (!promptNode || promptNode.type !== 'prompt') return null;
-    return {
-      positive: promptNode.positive || '',
-      negative: promptNode.negative || '',
-    };
-  }
-
   renderProperties() {
     const imgStatus = this.connectedImage ? '✅ Connected' : 'Click to connect an image node';
-    const promptStatus = this.connectedPrompt ? '✅ Connected' : 'Click to connect a prompt node';
 
     return `
       <div class="prop-section">
@@ -154,13 +118,6 @@ class InpaintNode {
           ${imgStatus}
         </div>
         ${this.connectedImage ? `<button class="prop-btn disconnect-btn" data-disconnect="image" style="margin-top:4px;font-size:11px;padding:4px 8px;width:100%">✂️ Disconnect</button>` : ''}
-      </div>
-      <div class="prop-section">
-        <label class="prop-section-label">✏️ Prompt</label>
-        <div class="workflow-input-slot" data-connect="prompt" data-expects="prompt" style="cursor:pointer">
-          ${promptStatus}
-        </div>
-        ${this.connectedPrompt ? `<button class="prop-btn disconnect-btn" data-disconnect="prompt" style="margin-top:4px;font-size:11px;padding:4px 8px;width:100%">✂️ Disconnect</button>` : ''}
       </div>
       <div class="prop-section">
         <label class="prop-section-label">🎨 Mask</label>
@@ -187,12 +144,6 @@ class InpaintNode {
       document.querySelector('[data-connect="image"]').textContent = '🔗 Click an image node...';
     });
 
-    // Connect prompt slot
-    document.querySelector('[data-connect="prompt"]')?.addEventListener('click', () => {
-      window._connectMode = { targetNodeId: this.id, connectType: 'prompt', expects: 'prompt' };
-      document.querySelector('[data-connect="prompt"]').textContent = '🔗 Click a prompt node...';
-    });
-
     // Disconnect buttons
     document.querySelectorAll('.disconnect-btn').forEach(el => {
       el.addEventListener('click', () => {
@@ -203,10 +154,6 @@ class InpaintNode {
           this.maskDataUrl = null;
           this.maskComfyName = null;
           this._updateStatus('No mask');
-          if (oldConn && window._engine) window._engine.removeConnectionBetween(oldConn.nodeId, this.id);
-        } else if (which === 'prompt') {
-          const oldConn = this.connectedPrompt;
-          this.connectedPrompt = null;
           if (oldConn && window._engine) window._engine.removeConnectionBetween(oldConn.nodeId, this.id);
         }
         if (window._refreshProperties) window._refreshProperties(this);
@@ -266,7 +213,6 @@ class InpaintNode {
       label: this.label,
       maskComfyName: this.maskComfyName,
       connectedImage: this.connectedImage,
-      connectedPrompt: this.connectedPrompt,
       x: this.fabricObject?.left || 0,
       y: this.fabricObject?.top || 0,
       // Note: maskDataUrl is a data URL which can be large — skip it in saves

@@ -346,16 +346,14 @@ function handleConnect(sourceNode) {
     targetNode._updateStatus(sourceNode.filename || 'Model');
     connected = true;
   } else if (mode.expects === 'prompt' && sourceNode.type === 'prompt') {
-    // Workflow or Inpaint node → prompt input
-    if (targetNode.type === 'inpaint' && mode.connectType === 'prompt') {
-      targetNode.connectedPrompt = { nodeId: sourceNode.id };
-    } else if (targetNode.connectInput) {
+    // Workflow node → prompt input
+    if (targetNode.connectInput) {
       targetNode.connectInput(mode.inputName, sourceNode.id);
     }
     connected = true;
   } else if (mode.expects === 'image' && sourceNode.type === 'image') {
     // Workflow or Inpaint node → image input
-    if (targetNode.type === 'inpaint' && mode.connectType === 'image') {
+    if (targetNode.type === 'inpaint') {
       targetNode.connectedImage = { nodeId: sourceNode.id };
     } else if (targetNode.connectInput) {
       targetNode.connectInput(mode.inputName, sourceNode.id);
