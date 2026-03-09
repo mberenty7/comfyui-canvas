@@ -259,7 +259,6 @@ class Viewer3D {
         fragmentShader: fragment,
         uniforms: this.uniforms,
         transparent: true,
-        skinning: needsSkinning,
       });
 
       this.currentModel.traverse(child => {
