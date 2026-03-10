@@ -660,11 +660,21 @@ async function runGenerate(genNode) {
         continue;
       }
       const dims = await getImageDimensions(result.imageUrl);
+      // Re-upload generated image to ComfyUI input so it can be used as input to other nodes
+      let comfyName = result.comfyName;
+      try {
+        const imgBlob = await (await fetch(result.imageUrl)).blob();
+        const upForm = new FormData();
+        upForm.append('image', imgBlob, result.comfyName);
+        const upResp = await fetch('/api/comfy/upload', { method: 'POST', body: upForm });
+        const upResult = await upResp.json();
+        if (upResult.comfyName) comfyName = upResult.comfyName;
+      } catch (err) { console.warn('Failed to re-upload generated image:', err); }
       const id = engine.nextId();
       const imgNode = new ImageNode(id, {
         imageUrl: result.imageUrl,
         filename: result.comfyName,
-        comfyName: result.comfyName,
+        comfyName: comfyName,
         width: dims.width,
         height: dims.height,
         format: 'PNG',
