@@ -1,0 +1,90 @@
+{
+  "name": "ControlNet Depth",
+  "description": "Generate images guided by a depth map using ControlNet",
+  "color": "#2196f3",
+  "inputs": [
+    {
+      "name": "prompt",
+      "type": "prompt",
+      "label": "Prompt",
+      "target_positive": { "node": "7", "field": "text" },
+      "target_negative": { "node": "8", "field": "text" }
+    },
+    {
+      "name": "image",
+      "type": "image",
+      "label": "Depth Map",
+      "target_node": "3",
+      "target_field": "image"
+    }
+  ],
+  "params": [
+    {
+      "name": "ckpt_name",
+      "label": "Checkpoint",
+      "type": "select",
+      "options": ["juggernautXL_ragnarok.safetensors", "perfectdeliberate_v60.safetensors", "newrealityxl_pro.safetensors", "sd_xl_base_1.0.safetensors"],
+      "default": "newrealityxl_pro.safetensors",
+      "target_node": "1",
+      "target_field": "ckpt_name"
+    },
+    {
+      "name": "strength",
+      "label": "ControlNet Strength",
+      "type": "slider",
+      "default": 0.6,
+      "min": 0,
+      "max": 1,
+      "step": 0.05,
+      "target_node": "9",
+      "target_field": "strength"
+    },
+    {
+      "name": "steps",
+      "label": "Steps",
+      "type": "integer",
+      "default": 30,
+      "min": 1,
+      "max": 100,
+      "target_node": "11",
+      "target_field": "steps"
+    },
+    {
+      "name": "cfg",
+      "label": "CFG Scale",
+      "type": "slider",
+      "default": 7,
+      "min": 1,
+      "max": 20,
+      "step": 0.5,
+      "target_node": "11",
+      "target_field": "cfg"
+    },
+    {
+      "name": "width",
+      "label": "Width",
+      "type": "select",
+      "options": ["512", "768", "896", "1024", "1152", "1280"],
+      "default": "1024",
+      "target_node": "10",
+      "target_field": "width"
+    },
+    {
+      "name": "height",
+      "label": "Height",
+      "type": "select",
+      "options": ["512", "768", "896", "1024", "1152", "1280"],
+      "default": "1024",
+      "target_node": "10",
+      "target_field": "height"
+    },
+    {
+      "name": "seed",
+      "label": "Seed",
+      "type": "seed",
+      "default": 42,
+      "target_node": "11",
+      "target_field": "seed"
+    }
+  ]
+}
