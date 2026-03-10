@@ -1,0 +1,52 @@
+{
+  "name": "Hunyuan3D",
+  "description": "Image to 3D model with Hunyuan3D (Pro)",
+  "color": "#e94560",
+  "inputs": [
+    {
+      "name": "image",
+      "type": "image",
+      "label": "Front Image",
+      "target_node": "1",
+      "target_field": "image"
+    }
+  ],
+  "params": [
+    {
+      "name": "model",
+      "label": "Model Version",
+      "type": "select",
+      "options": ["3.0", "2.0", "1.0"],
+      "default": "3.0",
+      "target_node": "2",
+      "target_field": "model"
+    },
+    {
+      "name": "face_count",
+      "label": "Face Count",
+      "type": "integer",
+      "default": 500000,
+      "min": 10000,
+      "max": 1000000,
+      "target_node": "2",
+      "target_field": "face_count"
+    },
+    {
+      "name": "generate_type",
+      "label": "Generate Type",
+      "type": "select",
+      "options": ["Normal", "Fast"],
+      "default": "Normal",
+      "target_node": "2",
+      "target_field": "generate_type"
+    },
+    {
+      "name": "seed",
+      "label": "Seed",
+      "type": "seed",
+      "default": 42,
+      "target_node": "2",
+      "target_field": "seed"
+    }
+  ]
+}

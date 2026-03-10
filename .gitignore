@@ -1,4 +1,4 @@
 node_modules/
 uploads/
 canvases/
-config.json
+/config.json
