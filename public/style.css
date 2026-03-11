@@ -556,8 +556,9 @@ body {
 
 #gallery-body {
   min-height: 0;
-  flex: 1;
+  flex: 1 1 0;
   overflow-y: auto;
+  max-height: calc(100vh - 140px);
   padding: 10px;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
