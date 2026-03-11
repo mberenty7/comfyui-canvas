@@ -45,15 +45,30 @@
       "name": "safety_tolerance",
       "label": "Safety Tolerance",
       "type": "select",
-      "options": ["0", "1", "2", "3", "4", "5", "6"],
+      "options": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
       "default": "2"
     },
     {
       "name": "output_format",
       "label": "Output Format",
       "type": "select",
-      "options": ["png", "jpeg"],
+      "options": [
+        "png",
+        "jpeg"
+      ],
       "default": "png"
     }
-  ]
+  ],
+  "cost": {
+    "credits": 0,
+    "note": "Uses BFL API key (separate billing)"
+  }
 }

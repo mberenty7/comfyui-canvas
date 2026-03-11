@@ -221,6 +221,11 @@ async function openSettings() {
   };
 
   document.getElementById('settings-cancel').onclick = () => modal.classList.add('hidden');
+
+  document.getElementById('settings-check-credits').onclick = () => {
+    window.open('https://platform.comfy.org/login', '_blank');
+    document.getElementById('settings-credit-result').textContent = 'Check balance on Comfy platform →';
+  };
 }
 
 // ── Import Image ─────────────────────────────
@@ -557,6 +562,7 @@ async function duplicateNode(nodeId) {
       templateColor: data.templateColor, inputs: data.inputs,
       params: data.params, workflow: data.workflow, label: data.label,
       backend: data.backend, bflEndpoint: data.bflEndpoint,
+      cost: data.cost,
     });
     if (data.paramValues) n.paramValues = { ...data.paramValues };
     n.createVisual(data.x + offsetX, data.y + offsetY);
@@ -653,7 +659,7 @@ async function addWorkflowNode() {
 
   list.innerHTML = templates.map(t => `
     <div class="template-card" data-id="${t.id}">
-      <h4 style="color:${t.color || '#4a9eff'}">${t.name}</h4>
+      <h4 style="color:${t.color || '#4a9eff'}">${t.name}${t.cost && t.cost.credits > 0 ? ' <span style="font-size:11px;color:#ff9800;font-weight:normal">~$' + (t.cost.credits / 211).toFixed(2) + '</span>' : t.cost ? '' : ''}</h4>
       <p style="font-size:12px;color:#888">${t.description || ''}</p>
     </div>
   `).join('');
@@ -679,6 +685,7 @@ async function addWorkflowNode() {
         workflow: template.workflow,
         backend: template.backend || 'comfy',
         bflEndpoint: template.bfl_endpoint || '',
+        cost: template.cost || null,
       });
       node.createVisual(pos.x - 90, pos.y - 35);
       engine.register(node);

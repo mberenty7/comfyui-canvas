@@ -16,7 +16,11 @@
       "name": "model",
       "label": "Model Version",
       "type": "select",
-      "options": ["3.0", "2.0", "1.0"],
+      "options": [
+        "3.0",
+        "2.0",
+        "1.0"
+      ],
       "default": "3.0",
       "target_node": "2",
       "target_field": "model"
@@ -35,7 +39,10 @@
       "name": "generate_type",
       "label": "Generate Type",
       "type": "select",
-      "options": ["Normal", "Fast"],
+      "options": [
+        "Normal",
+        "Fast"
+      ],
       "default": "Normal",
       "target_node": "2",
       "target_field": "generate_type"
@@ -48,5 +55,9 @@
       "target_node": "2",
       "target_field": "seed"
     }
-  ]
+  ],
+  "cost": {
+    "credits": 150,
+    "note": "Tencent partner node"
+  }
 }

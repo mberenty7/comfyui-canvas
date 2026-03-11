@@ -2,12 +2,13 @@
 // Inputs (prompt, image) come from connected nodes — not from this node's properties
 
 class WorkflowNode {
-  constructor(id, { templateId, templateName, templateColor, inputs, params, workflow, label, backend, bflEndpoint } = {}) {
+  constructor(id, { templateId, templateName, templateColor, inputs, params, workflow, label, backend, bflEndpoint, cost } = {}) {
     this.id = id;
     this.type = 'workflow';
     this.templateId = templateId || '';
     this.templateName = templateName || 'Workflow';
     this.templateColor = templateColor || '#4a9eff';
+    this.cost = cost || null;
     this.templateInputs = inputs || [];  // from config.json
     this.templateParams = params || [];
     this.workflow = workflow || {};
@@ -260,6 +261,10 @@ class WorkflowNode {
         <label class="prop-section-label">Template</label>
         <div class="prop-value" style="padding:4px 0;color:${this.templateColor}">${this.templateName}</div>
       </div>
+      ${this.cost ? `<div class="prop-section">
+        <label class="prop-section-label">💰 Cost per run</label>
+        <div class="prop-value" style="padding:4px 0;color:${this.cost.credits > 0 ? '#ff9800' : '#4caf50'}">${this.cost.credits > 0 ? this.cost.credits + ' credits (~$' + (this.cost.credits / 211).toFixed(2) + ')' : 'Free / separate billing'}${this.cost.note ? ' — ' + this.cost.note : ''}</div>` : ''}
+      </div>
     `;
 
     // Connected inputs
@@ -373,6 +378,7 @@ class WorkflowNode {
       type: this.type,
       templateId: this.templateId,
       templateName: this.templateName,
+      cost: this.cost,
       templateColor: this.templateColor,
       inputs: this.templateInputs,
       params: this.templateParams,

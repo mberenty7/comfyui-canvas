@@ -1,5 +1,5 @@
 {
-  "name": "Trellis 2 (Image → 3D)",
+  "name": "Trellis 2 (Image \u2192 3D)",
   "description": "Generate a textured 3D model from an image using Microsoft TRELLIS 2",
   "color": "#9c27b0",
   "inputs": [
@@ -16,7 +16,11 @@
       "name": "resolution",
       "label": "Resolution",
       "type": "select",
-      "options": ["512", "1024_cascade", "1536_cascade"],
+      "options": [
+        "512",
+        "1024_cascade",
+        "1536_cascade"
+      ],
       "default": "512",
       "target_node": "1",
       "target_field": "resolution"
@@ -67,7 +71,11 @@
       "name": "render_mode",
       "label": "Preview Mode",
       "type": "select",
-      "options": ["normal", "clay", "base_color"],
+      "options": [
+        "normal",
+        "clay",
+        "base_color"
+      ],
       "default": "normal",
       "target_node": "7",
       "target_field": "render_mode"
@@ -80,5 +88,9 @@
       "target_node": "5",
       "target_field": "seed"
     }
-  ]
+  ],
+  "cost": {
+    "credits": 100,
+    "note": "Trellis 3D (estimate)"
+  }
 }
