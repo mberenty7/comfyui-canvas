@@ -933,13 +933,16 @@ async function loadGallery() {
     }
 
     body.innerHTML = '';
+    const grid = document.createElement('div');
+    grid.id = 'gallery-grid';
     galleryImages.forEach((img, i) => {
       const thumb = document.createElement('div');
       thumb.className = 'gallery-thumb';
       thumb.innerHTML = `<img loading="lazy" src="${galleryImageSrc(img)}"><div class="gallery-name">${img.filename}</div>`;
       thumb.addEventListener('click', () => openGalleryLightbox(i));
-      body.appendChild(thumb);
+      grid.appendChild(thumb);
     });
+    body.appendChild(grid);
   } catch (err) {
     body.innerHTML = `<div class="gallery-empty">Failed to load:<br>${err.message}</div>`;
   }
