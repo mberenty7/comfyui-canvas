@@ -456,8 +456,23 @@ function setupKeyboard() {
       openQuickAdd();
     }
 
-    if ((e.key === 'Delete' || e.key === 'Backspace') && engine.selectedNode) {
-      deleteNode(engine.selectedNode.id);
+    if ((e.key === 'Delete' || e.key === 'Backspace')) {
+      // Multi-select delete
+      const activeObj = engine.fc.getActiveObject();
+      if (activeObj && activeObj.type === 'activeSelection') {
+        const objects = activeObj.getObjects();
+        const nodeIds = objects.map(o => { while (o && !o.nodeId && o.group) o = o.group; return o?.nodeId; }).filter(Boolean);
+        engine.fc.discardActiveObject();
+        nodeIds.forEach(id => deleteNode(id));
+      } else if (engine.selectedNode) {
+        deleteNode(engine.selectedNode.id);
+      }
+    }
+
+    // Ctrl+D to duplicate selected node
+    if (e.key === 'd' && (e.ctrlKey || e.metaKey) && engine.selectedNode) {
+      e.preventDefault();
+      duplicateNode(engine.selectedNode.id);
     }
   });
 }
@@ -511,6 +526,64 @@ function deleteNode(nodeId) {
   if (engine.selectedNode?.id === nodeId) {
     engine.selectedNode = null;
     closeProperties();
+  }
+  if (window._scheduleAutosave) window._scheduleAutosave();
+}
+
+async function duplicateNode(nodeId) {
+  const node = engine.nodes.get(nodeId);
+  if (!node || !node.serialize) return;
+  const data = node.serialize();
+  const newId = engine.nextId();
+  const offsetX = 30, offsetY = 30;
+
+  if (data.type === 'image') {
+    const n = new ImageNode(newId, {
+      imageUrl: data.imageUrl, filename: data.filename, comfyName: data.comfyName,
+      width: data.width, height: data.height, fileSize: data.fileSize,
+      format: data.format, label: data.label, maskComfyName: data.maskComfyName,
+    });
+    await n.createVisual(data.x + offsetX, data.y + offsetY);
+    engine.register(n);
+  } else if (data.type === 'prompt') {
+    const n = new PromptNode(newId, {
+      positive: data.positive, negative: data.negative, label: data.label,
+    });
+    n.createVisual(data.x + offsetX, data.y + offsetY);
+    engine.register(n);
+  } else if (data.type === 'workflow') {
+    const n = new WorkflowNode(newId, {
+      templateId: data.templateId, templateName: data.templateName,
+      templateColor: data.templateColor, inputs: data.inputs,
+      params: data.params, workflow: data.workflow, label: data.label,
+      backend: data.backend, bflEndpoint: data.bflEndpoint,
+    });
+    if (data.paramValues) n.paramValues = { ...data.paramValues };
+    n.createVisual(data.x + offsetX, data.y + offsetY);
+    engine.register(n);
+  } else if (data.type === 'generate') {
+    const n = new GenerateNode(newId, {
+      count: data.count, seedMode: data.seedMode, baseSeed: data.baseSeed,
+      outputName: data.outputName, label: data.label,
+    });
+    n.createVisual(data.x + offsetX, data.y + offsetY);
+    engine.register(n);
+  } else if (data.type === 'inpaint') {
+    const n = new InpaintNode(newId, { label: data.label });
+    n.createVisual(data.x + offsetX, data.y + offsetY);
+    engine.register(n);
+  } else if (data.type === 'viewer') {
+    const n = new ViewerNode(newId, { label: data.label });
+    n.createVisual(data.x + offsetX, data.y + offsetY);
+    engine.register(n);
+  } else if (data.type === 'model') {
+    const n = new ModelNode(newId, {
+      modelUrl: data.modelUrl, filename: data.filename,
+      comfyName: data.comfyName, format: data.format,
+      fileSize: data.fileSize, label: data.label,
+    });
+    n.createVisual(data.x + offsetX, data.y + offsetY);
+    engine.register(n);
   }
   if (window._scheduleAutosave) window._scheduleAutosave();
 }
