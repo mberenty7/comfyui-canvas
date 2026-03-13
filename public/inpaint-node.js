@@ -167,6 +167,7 @@ class InpaintNode {
       if (!imgNode || !imgNode.imageUrl) return;
 
       if (window._maskEditor) {
+        window._maskEditor.comfyName = imgNode.comfyName || null;
         window._maskEditor.open(
           imgNode.imageUrl,
           imgNode.width || 1024,

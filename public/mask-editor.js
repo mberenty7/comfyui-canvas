@@ -10,6 +10,11 @@ class MaskEditor {
     this.imageHeight = 0;
     this.brushSize = 40;
     this.isErasing = false;
+    this.isSam3Mode = false;
+    this.sam3Positive = [];   // [{x, y}] in original image coords
+    this.sam3Negative = [];
+    this.sam3Loading = false;
+    this.comfyName = null;    // filename of source image in ComfyUI
     this.onSave = null;       // callback(maskDataUrl)
     this._build();
   }
@@ -30,6 +35,9 @@ class MaskEditor {
               <span id="mask-brush-size-val">40</span>
             </label>
             <button class="mask-tool" data-tool="clear" title="Clear mask">🗑️ Clear</button>
+            <span style="border-left:1px solid #555;margin:0 4px"></span>
+            <button class="mask-tool" data-tool="sam3" title="SAM3 Select — click to segment">🎯 SAM3</button>
+            <span id="mask-sam3-status" style="font-size:11px;color:#888;margin-left:4px"></span>
             <button class="mask-tool" data-tool="invert" title="Invert mask">🔄 Invert</button>
             <button class="mask-tool" data-tool="fill" title="Fill all">⬜ Fill</button>
           </div>
@@ -73,13 +81,19 @@ class MaskEditor {
     });
   }
 
-  open(imageUrl, width, height, existingMask, onSave) {
+  open(imageUrl, width, height, existingMask, onSave, opts = {}) {
     this.imageUrl = imageUrl;
+    this.comfyName = opts.comfyName || null;
     this.imageWidth = width;
     this.imageHeight = height;
     this.onSave = onSave;
 
     this.modal.classList.remove('hidden');
+    this.isSam3Mode = false;
+    this.sam3Positive = [];
+    this.sam3Negative = [];
+    this.sam3Loading = false;
+    this._updateSam3Status('');
 
     // Calculate display size (fit in viewport)
     const maxW = window.innerWidth * 0.8;
@@ -114,6 +128,9 @@ class MaskEditor {
     this.canvas.freeDrawingBrush.width = this.brushSize;
     this.canvas.freeDrawingBrush.color = 'rgba(255, 0, 0, 0.5)';
     this.isErasing = false;
+
+    // Setup SAM3 click handling
+    this._setupSam3Click();
 
     // Load existing mask if provided
     if (existingMask) {
@@ -164,7 +181,19 @@ class MaskEditor {
       return;
     }
 
+    if (tool === 'sam3') {
+      this.modal.querySelectorAll('.mask-tool').forEach(b => b.classList.remove('active'));
+      this.modal.querySelector('[data-tool="sam3"]')?.classList.add('active');
+      this.isSam3Mode = true;
+      this.canvas.isDrawingMode = false;
+      this._updateSam3Status('Left-click = add, Right-click = exclude');
+      return;
+    }
+
     // Brush / Eraser toggle
+    this.isSam3Mode = false;
+    this.canvas.isDrawingMode = true;
+    this._updateSam3Status('');
     this.modal.querySelectorAll('.mask-tool').forEach(b => b.classList.remove('active'));
     this.modal.querySelector(`[data-tool="${tool}"]`)?.classList.add('active');
 
@@ -262,6 +291,149 @@ class MaskEditor {
     return offscreen;
   }
 
+  _updateSam3Status(text) {
+    const el = this.modal.querySelector('#mask-sam3-status');
+    if (el) el.textContent = text;
+  }
+
+  _setupSam3Click() {
+    // Called after canvas is created
+    const upperCanvas = this.canvas.upperCanvasEl;
+
+    upperCanvas.addEventListener('mousedown', async (e) => {
+      if (!this.isSam3Mode || this.sam3Loading) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const rect = upperCanvas.getBoundingClientRect();
+      const scaleX = this.imageWidth / this.canvas.width;
+      const scaleY = this.imageHeight / this.canvas.height;
+
+      const point = {
+        x: Math.round((e.clientX - rect.left) * scaleX),
+        y: Math.round((e.clientY - rect.top) * scaleY)
+      };
+
+      // Right-click = negative, left-click = positive
+      if (e.button === 2) {
+        this.sam3Negative.push(point);
+      } else {
+        this.sam3Positive.push(point);
+      }
+
+      // Show point markers
+      const displayX = (e.clientX - rect.left);
+      const displayY = (e.clientY - rect.top);
+      const marker = new fabric.Circle({
+        radius: 5,
+        fill: e.button === 2 ? '#ff4444' : '#44ff44',
+        stroke: '#fff',
+        strokeWidth: 2,
+        left: displayX - 5,
+        top: displayY - 5,
+        selectable: false,
+        evented: false,
+        sam3Marker: true,
+      });
+      this.canvas.add(marker);
+      this.canvas.renderAll();
+
+      // Run SAM3
+      await this._runSam3();
+    });
+
+    // Prevent context menu in SAM3 mode
+    upperCanvas.addEventListener('contextmenu', (e) => {
+      if (this.isSam3Mode) e.preventDefault();
+    });
+  }
+
+  async _runSam3() {
+    if (!this.comfyName) {
+      this._updateSam3Status('Error: no image uploaded to ComfyUI');
+      return;
+    }
+    if (this.sam3Positive.length === 0 && this.sam3Negative.length === 0) return;
+
+    this.sam3Loading = true;
+    this._updateSam3Status('Segmenting...');
+
+    try {
+      const resp = await fetch('/api/comfy/sam3-segment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageName: this.comfyName,
+          positivePoints: this.sam3Positive,
+          negativePoints: this.sam3Negative,
+        }),
+      });
+
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error || 'SAM3 failed');
+
+      // Remove old mask overlays and markers
+      const toRemove = this.canvas.getObjects().filter(o => o.sam3Mask || o.sam3Marker);
+      toRemove.forEach(o => this.canvas.remove(o));
+
+      // Load the mask as a red overlay
+      const maskUrl = data.maskUrl;
+      fabric.Image.fromURL(maskUrl, (maskImg) => {
+        maskImg.scaleToWidth(this.canvas.width);
+        maskImg.set({
+          selectable: false,
+          evented: false,
+          opacity: 0.5,
+          sam3Mask: true,
+        });
+
+        // Tint to red using a filter or blend
+        // Simple approach: we'll use the mask as-is (white = selected)
+        // and apply a red tint via CSS filter
+        maskImg.filters = [
+          new fabric.Image.filters.BlendColor({ color: '#ff0000', mode: 'tint', alpha: 0.8 })
+        ];
+        maskImg.applyFilters();
+
+        this.canvas.add(maskImg);
+
+        // Re-add point markers on top
+        this.sam3Positive.forEach(p => {
+          const dx = p.x / (this.imageWidth / this.canvas.width);
+          const dy = p.y / (this.imageHeight / this.canvas.height);
+          this.canvas.add(new fabric.Circle({
+            radius: 5, fill: '#44ff44', stroke: '#fff', strokeWidth: 2,
+            left: dx - 5, top: dy - 5,
+            selectable: false, evented: false, sam3Marker: true,
+          }));
+        });
+        this.sam3Negative.forEach(p => {
+          const dx = p.x / (this.imageWidth / this.canvas.width);
+          const dy = p.y / (this.imageHeight / this.canvas.height);
+          this.canvas.add(new fabric.Circle({
+            radius: 5, fill: '#ff4444', stroke: '#fff', strokeWidth: 2,
+            left: dx - 5, top: dy - 5,
+            selectable: false, evented: false, sam3Marker: true,
+          }));
+        });
+
+        this.canvas.renderAll();
+        this._updateSam3Status(
+          this.sam3Positive.length + ' add, ' + this.sam3Negative.length + ' exclude — click more to refine'
+        );
+      }, { crossOrigin: 'anonymous' });
+
+      // Store the mask URL for saving
+      this._sam3MaskUrl = maskUrl;
+
+    } catch (err) {
+      console.error('SAM3 error:', err);
+      this._updateSam3Status('Error: ' + err.message);
+    } finally {
+      this.sam3Loading = false;
+    }
+  }
+
   _save() {
     // Simpler approach: use fabric's toDataURL but with only objects visible
     // Create the mask at original resolution
@@ -289,6 +461,21 @@ class MaskEditor {
     // Draw the mask paint onto offscreen, converting red paint to white
     const tempImg = new Image();
     tempImg.onload = () => {
+      // If we have a SAM3 mask, fetch it and use it directly
+      if (this._sam3MaskUrl) {
+        const sam3Img = new Image();
+        sam3Img.crossOrigin = 'anonymous';
+        sam3Img.onload = () => {
+          ctx.drawImage(sam3Img, 0, 0, this.imageWidth, this.imageHeight);
+          const maskDataUrl = offscreen.toDataURL('image/png');
+          if (this.onSave) this.onSave(maskDataUrl);
+          this._sam3MaskUrl = null;
+          this.close();
+        };
+        sam3Img.src = this._sam3MaskUrl;
+        return;
+      }
+
       ctx.drawImage(tempImg, 0, 0, this.imageWidth, this.imageHeight);
 
       // Convert: any pixel with red > threshold → white, else → black

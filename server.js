@@ -544,6 +544,104 @@ app.get('/api/comfy/mesh', async (req, res) => {
   }
 });
 
+// ── SAM3 Segmentation ────────────────────────
+// Run SAM3 segmentation with point prompts on an image
+app.post('/api/comfy/sam3-segment', async (req, res) => {
+  try {
+    const { imageName, positivePoints, negativePoints } = req.body;
+    if (!imageName) return res.status(400).json({ error: 'imageName required' });
+
+    // Build a minimal workflow: LoadImage -> LoadSAM3Model -> SAM3ImageSegment -> MaskToImage -> SaveImage
+    const posStr = (positivePoints && positivePoints.length > 0) ? JSON.stringify(positivePoints) : undefined;
+    const negStr = (negativePoints && negativePoints.length > 0) ? JSON.stringify(negativePoints) : undefined;
+
+    const workflow = {
+      "1": {
+        "class_type": "LoadImage",
+        "inputs": { "image": imageName }
+      },
+      "2": {
+        "class_type": "easy sam3ModelLoader",
+        "inputs": {
+          "model": "sam3_hiera_large.pt",
+          "segmentor": "image",
+          "device": "cuda",
+          "precision": "fp16"
+        }
+      },
+      "3": {
+        "class_type": "easy sam3ImageSegmentation",
+        "inputs": {
+          "sam3_model": ["2", 0],
+          "images": ["1", 0],
+          "prompt": "",
+          "threshold": 0.4,
+          "keep_model_loaded": true,
+          "add_background": "none",
+          "detection_limit": -1
+        }
+      },
+      "5": {
+        "class_type": "MaskToImage",
+        "inputs": {
+          "mask": ["3", 0]
+        }
+      },
+      "6": {
+        "class_type": "SaveImage",
+        "inputs": {
+          "images": ["5", 0],
+          "filename_prefix": "sam3_mask_bw"
+        }
+      }
+    };
+
+    // Add point coordinates as optional inputs
+    if (posStr) workflow["3"].inputs.coordinates_positive = posStr;
+    if (negStr) workflow["3"].inputs.coordinates_negative = negStr;
+
+    const payload = { prompt: workflow };
+    if (config.comfyApiKey) {
+      payload.extra_data = { api_key_comfy_org: config.comfyApiKey };
+    }
+
+    // Submit workflow
+    const submitResult = await proxyRequest('POST', '/prompt', payload);
+    if (!submitResult.data || !submitResult.data.prompt_id) {
+      return res.status(500).json({ error: 'Failed to submit SAM3 workflow' });
+    }
+
+    const promptId = submitResult.data.prompt_id;
+
+    // Poll for result (max 30 seconds)
+    for (let i = 0; i < 60; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      const histResult = await proxyRequest('GET', '/history/' + promptId);
+      const entry = histResult.data?.[promptId];
+      if (entry?.status?.completed) {
+        // Find the mask output (node 6 = MaskToImage -> SaveImage)
+        const maskOutput = entry.outputs?.['6'];
+        if (maskOutput?.images?.[0]) {
+          const img = maskOutput.images[0];
+          return res.json({
+            success: true,
+            maskFilename: img.filename,
+            maskUrl: '/api/comfy/view?filename=' + encodeURIComponent(img.filename) + '&subfolder=' + encodeURIComponent(img.subfolder || '') + '&type=output',
+          });
+        }
+        return res.status(500).json({ error: 'SAM3 completed but no mask output found' });
+      }
+      if (entry?.status?.status_str === 'error') {
+        return res.status(500).json({ error: 'SAM3 workflow failed' });
+      }
+    }
+    res.status(504).json({ error: 'SAM3 timed out' });
+  } catch (err) {
+    console.error('[SAM3] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── BFL (Flux) API ───────────────────────────
 
 function bflRequest(method, urlPath, body) {
