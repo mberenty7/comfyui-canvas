@@ -167,7 +167,7 @@ class InpaintNode {
       if (!imgNode || !imgNode.imageUrl) return;
 
       if (window._maskEditor) {
-        window._maskEditor.comfyName = imgNode.comfyName || null;
+        
         window._maskEditor.open(
           imgNode.imageUrl,
           imgNode.width || 1024,
@@ -194,7 +194,7 @@ class InpaintNode {
 
             if (window._refreshProperties) window._refreshProperties(this);
           }
-        );
+        , { comfyName: imgNode.comfyName });
       }
     });
 
