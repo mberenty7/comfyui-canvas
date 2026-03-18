@@ -152,28 +152,65 @@ class TilePreviewNode {
         this.label = labelInput.value;
       });
     }
+
+    // Connect image slot (same pattern as inpaint node)
+    document.querySelector('[data-connect="image"]')?.addEventListener('click', () => {
+      window._connectMode = { targetNodeId: this.id, connectType: 'tile-image', expects: 'image' };
+      const slot = document.querySelector('[data-connect="image"]');
+      if (slot) slot.textContent = '🔗 Click an image node...';
+    });
+
+    // Disconnect button
+    document.querySelectorAll('.disconnect-btn').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (el.dataset.disconnect === 'image') {
+          const oldConn = this.connectedImage;
+          this.connectedImage = null;
+          // Remove tile preview visuals
+          if (this._tileGroup && this.fabricObject) {
+            const idx = this.fabricObject._objects.indexOf(this._tileGroup);
+            if (idx >= 0) this.fabricObject._objects.splice(idx, 1);
+            this._tileGroup = null;
+            this.fabricObject.canvas?.renderAll();
+          }
+          if (oldConn && window._engine) window._engine.removeConnectionBetween(oldConn.nodeId, this.id);
+        }
+        if (window._refreshProperties) window._refreshProperties(this);
+      });
+    });
+
+    // Grid size buttons
+    document.querySelectorAll('.grid-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.setGridSize(parseInt(btn.dataset.grid));
+        if (window._refreshProperties) window._refreshProperties(this);
+      });
+    });
   }
 
   renderProperties() {
-    const connected = this.connectedImage
-      ? `<span class="prop-value" style="color:#4caf50">Connected</span>`
-      : `<button class="prop-btn" onclick="window._connectTileImage(${this.id})">Select Image</button>`;
+    const imgStatus = this.connectedImage
+      ? `<span style="color:#4caf50">✅ Connected</span> <button class="disconnect-btn" data-disconnect="image" style="font-size:10px;margin-left:6px;cursor:pointer;background:none;border:1px solid #666;color:#aaa;border-radius:4px;padding:1px 6px">✕</button>`
+      : `🔗 Click to select image...`;
 
     return `
       <div class="prop-section">
         <label class="prop-section-label">Label</label>
         <input type="text" id="node-label" class="prop-input" value="${this.label}" placeholder="e.g. Brick Tile Check">
       </div>
-      <div class="prop-row">
-        <span class="prop-label">Image Input</span>
-        ${connected}
+      <div class="prop-section">
+        <label class="prop-section-label">📷 Source Image</label>
+        <div class="workflow-input-slot" data-connect="image" data-expects="image" style="cursor:pointer">
+          ${imgStatus}
+        </div>
       </div>
       <div class="prop-section">
         <label class="prop-section-label">Grid Size</label>
         <div style="display:flex;gap:8px;margin-top:4px">
-          <button class="prop-btn ${this.gridSize === 2 ? 'active' : ''}" onclick="window._setTileGrid(2)">2×2</button>
-          <button class="prop-btn ${this.gridSize === 3 ? 'active' : ''}" onclick="window._setTileGrid(3)">3×3</button>
-          <button class="prop-btn ${this.gridSize === 4 ? 'active' : ''}" onclick="window._setTileGrid(4)">4×4</button>
+          <button class="prop-btn grid-btn ${this.gridSize === 2 ? 'active' : ''}" data-grid="2">2×2</button>
+          <button class="prop-btn grid-btn ${this.gridSize === 3 ? 'active' : ''}" data-grid="3">3×3</button>
+          <button class="prop-btn grid-btn ${this.gridSize === 4 ? 'active' : ''}" data-grid="4">4×4</button>
         </div>
       </div>
     `;

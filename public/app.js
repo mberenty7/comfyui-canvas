@@ -715,19 +715,6 @@ function addTilePreviewNode() {
   engine.register(node);
 }
 
-// Global callback for tile preview image connection
-window._connectTileImage = (nodeId) => {
-  window._connectMode = { targetNodeId: nodeId, connectType: 'tile-image', expects: 'image' };
-};
-
-// Global callback for tile grid size buttons in properties panel
-window._setTileGrid = (size) => {
-  const sel = engine.selectedNode;
-  if (sel && sel.type === 'tile-preview') {
-    sel.setGridSize(size);
-    engine.showProperties(sel);
-  }
-};
 
 function addInpaintNode() {
   const pos = engine.canvasCenter();
