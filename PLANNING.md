@@ -66,6 +66,13 @@ Current templates:
 - [ ] Right-click context menu (add node, disconnect, delete)
 - [ ] Node grouping / selection
 
+### Phase 2.5 — 3D Pipeline Tools
+- [x] Tile Preview node + modal viewer (zoom/pan, 2×2 to 5×5 grid)
+- [ ] BBox Transfer node — extract bounding box from reference 3D model, rescale generated models to match
+  - Server-side Python (trimesh): `POST /api/bbox/extract` + `POST /api/bbox/apply`
+  - Canvas node connects to reference Model node, stores dimensions, applies to generated models
+  - Solves Hunyuan/Tripo scale inconsistency in depth→concept→3D pipeline
+
 ### Phase 3 — Drawing + Polish
 - [ ] Sketch tools (brush, shapes) directly on canvas
 - [ ] Use sketches as depth/controlnet inputs
