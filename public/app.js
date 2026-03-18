@@ -66,6 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Mask Editor
   window._maskEditor = new MaskEditor();
+  window._tileViewer = new TileViewer();
 
   // 3D Viewer
   window._viewer3d = new Viewer3D();
