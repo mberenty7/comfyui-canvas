@@ -271,6 +271,14 @@ class CanvasEngine {
         node.createVisual(n.x, n.y);
         this.register(node);
 
+      } else if (n.type === 'tile-preview') {
+        const node = new TilePreviewNode(n.id, {
+          label: n.label, gridSize: n.gridSize,
+          connectedImage: n.connectedImage,
+        });
+        node.createVisual(n.x, n.y);
+        this.register(node);
+
       } else if (n.type === 'generate') {
         const node = new GenerateNode(n.id, {
           count: n.count, seedMode: n.seedMode, baseSeed: n.baseSeed,

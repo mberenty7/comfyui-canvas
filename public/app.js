@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
   addMenu.querySelector('[data-action="model"]').addEventListener('click', () => { addMenu.classList.add('hidden'); importModel(); });
   addMenu.querySelector('[data-action="viewer"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addViewerNode(); });
   addMenu.querySelector('[data-action="generate"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addGenerateNode(); });
+  addMenu.querySelector('[data-action="tile-preview"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addTilePreviewNode(); });
 
   document.getElementById('btn-log').addEventListener('click', toggleLog);
   document.getElementById('log-close').addEventListener('click', () => document.getElementById('log-panel').classList.add('hidden'));
@@ -393,6 +394,10 @@ function handleConnect(sourceNode) {
       targetNode.connectInput(mode.inputName, sourceNode.id);
     }
     connected = true;
+  } else if (mode.connectType === 'tile-image' && sourceNode.type === 'image') {
+    // Tile preview → image input
+    targetNode.connectImage(sourceNode.id, sourceNode.imageUrl);
+    connected = true;
   } else if (mode.expects === 'image' && sourceNode.type === 'image') {
     // Workflow or Inpaint node → image input
     if (targetNode.type === 'inpaint') {
@@ -510,6 +515,7 @@ function openQuickAdd() {
       else if (action === 'model') importModel();
       else if (action === 'viewer') addViewerNode();
       else if (action === 'generate') addGenerateNode();
+      else if (action === 'tile-preview') addTilePreviewNode();
     };
   });
 
@@ -700,6 +706,28 @@ function addViewerNode() {
   node.createVisual(pos.x - 90, pos.y - 35);
   engine.register(node);
 }
+
+function addTilePreviewNode() {
+  const pos = engine.canvasCenter();
+  const id = engine.nextId();
+  const node = new TilePreviewNode(id);
+  node.createVisual(pos.x - 110, pos.y - 120);
+  engine.register(node);
+}
+
+// Global callback for tile preview image connection
+window._connectTileImage = (nodeId) => {
+  window._connectMode = { targetNodeId: nodeId, connectType: 'tile-image', expects: 'image' };
+};
+
+// Global callback for tile grid size buttons in properties panel
+window._setTileGrid = (size) => {
+  const sel = engine.selectedNode;
+  if (sel && sel.type === 'tile-preview') {
+    sel.setGridSize(size);
+    engine.showProperties(sel);
+  }
+};
 
 function addInpaintNode() {
   const pos = engine.canvasCenter();
