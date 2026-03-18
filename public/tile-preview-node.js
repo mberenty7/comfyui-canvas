@@ -5,46 +5,61 @@ class TilePreviewNode {
     this.id = id;
     this.type = 'tile-preview';
     this.label = opts.label || '';
-    this.gridSize = opts.gridSize || 3; // 2 or 3
+    this.gridSize = opts.gridSize || 3;
     this.connectedImage = opts.connectedImage || null; // { nodeId, imageUrl }
     this.fabricObject = null;
-    this._tileGroup = null;
+    this._previewImg = null; // fabric.Image for the tiled preview
   }
 
   createVisual(x, y) {
     const w = 220;
     const headerH = 24;
     const previewH = 200;
-    const footerH = 8;
-    const totalH = headerH + previewH + footerH;
+    const totalH = headerH + previewH + 8;
 
     const border = new fabric.Rect({
       width: w, height: totalH,
       fill: '#1e1e3a', stroke: '#e6a817', strokeWidth: 1.5,
       rx: 8, ry: 8,
+      originX: 'left', originY: 'top',
     });
 
-    const typeLabel = new fabric.Text('🔲 Tile Preview', {
-      fontSize: 11, fill: '#e6a817', fontWeight: 'bold',
-      fontFamily: 'Inter, sans-serif', left: 8, top: 5,
+    const typeLabel = new fabric.Text('Tile Preview', {
+      fontSize: 10, fill: '#e6a817', fontWeight: 'bold',
+      fontFamily: 'Inter, sans-serif',
+      left: 8, top: 5,
+      originX: 'left', originY: 'top',
     });
 
     // Input port (left side)
     const inputPort = new fabric.Circle({
       radius: 6, fill: '#4a9eff', stroke: '#fff', strokeWidth: 2,
       left: -6, top: totalH / 2 - 6,
+      originX: 'left', originY: 'top',
     });
 
-    // Placeholder text when no image connected
-    const placeholder = new fabric.Text('Connect an image\nto preview tiling', {
+    // Placeholder text
+    this._placeholder = new fabric.Text('Connect an image\nto preview tiling', {
       fontSize: 11, fill: '#666', fontFamily: 'Inter, sans-serif',
-      textAlign: 'center', left: w / 2, top: headerH + previewH / 2 - 12,
-      originX: 'center',
+      textAlign: 'center',
+      left: w / 2, top: headerH + previewH / 2 - 12,
+      originX: 'center', originY: 'top',
     });
 
-    const group = new fabric.Group([border, typeLabel, inputPort, placeholder], {
+    // Preview background
+    const previewBg = new fabric.Rect({
+      width: previewH, height: previewH,
+      fill: '#111',
+      left: (w - previewH) / 2, top: headerH,
+      originX: 'left', originY: 'top',
+    });
+
+    const objects = [border, typeLabel, inputPort, previewBg, this._placeholder];
+
+    const group = new fabric.Group(objects, {
       left: x, top: y,
       hasControls: false, hasBorders: false,
+      subTargetCheck: false,
     });
 
     group.nodeId = this.id;
@@ -65,67 +80,63 @@ class TilePreviewNode {
 
     const group = this.fabricObject;
     const canvas = group.canvas;
-    const w = 220;
+    const nodeW = 220;
     const headerH = 24;
-    const previewH = 200;
+    const previewSize = 200;
     const grid = this.gridSize;
 
-    // Remove old tile group and placeholder
-    if (this._tileGroup) {
-      const idx = group._objects.indexOf(this._tileGroup);
-      if (idx >= 0) group._objects.splice(idx, 1);
-      this._tileGroup = null;
-    }
-    // Remove placeholder text (index 3)
-    const placeholder = group._objects.find(o => o.type === 'text' && o.text?.includes('Connect'));
-    if (placeholder) {
-      const idx = group._objects.indexOf(placeholder);
-      if (idx >= 0) group._objects.splice(idx, 1);
-    }
+    // Load the source image
+    const imgEl = new Image();
+    imgEl.crossOrigin = 'anonymous';
+    imgEl.onload = () => {
+      // Render tiled grid to an offscreen canvas
+      const offscreen = document.createElement('canvas');
+      offscreen.width = previewSize;
+      offscreen.height = previewSize;
+      const ctx = offscreen.getContext('2d');
 
-    fabric.Image.fromURL(this.connectedImage.imageUrl, (img) => {
-      const tileSize = previewH / grid;
-      const scale = tileSize / Math.max(img.width, img.height);
-      const tileW = img.width * scale;
-      const tileH = img.height * scale;
-
-      const tiles = [];
-      // Clip rect for the preview area
-      const clipRect = new fabric.Rect({
-        width: previewH, height: previewH,
-        fill: '#111', left: (w - previewH) / 2, top: headerH,
-      });
-      tiles.push(clipRect);
-
-      const offsetX = (w - previewH) / 2;
-      let loaded = 0;
-      const total = grid * grid;
+      const tileW = previewSize / grid;
+      const tileH = previewSize / grid;
 
       for (let row = 0; row < grid; row++) {
         for (let col = 0; col < grid; col++) {
-          fabric.Image.fromURL(this.connectedImage.imageUrl, (tileImg) => {
-            tileImg.scale(scale);
-            tileImg.set({
-              left: offsetX + col * tileW,
-              top: headerH + row * tileH,
-              originX: 'left', originY: 'top',
-            });
-            tiles.push(tileImg);
-            loaded++;
-
-            if (loaded === total) {
-              const tileGroup = new fabric.Group(tiles, {
-                left: 0, top: 0,
-                originX: 'left', originY: 'top',
-              });
-              this._tileGroup = tileGroup;
-              group.addWithUpdate(tileGroup);
-              if (canvas) canvas.renderAll();
-            }
-          }, { crossOrigin: 'anonymous' });
+          ctx.drawImage(imgEl, col * tileW, row * tileH, tileW, tileH);
         }
       }
-    }, { crossOrigin: 'anonymous' });
+
+      // Remove old preview image from group
+      if (this._previewImg) {
+        group.removeWithUpdate(this._previewImg);
+        this._previewImg = null;
+      }
+
+      // Hide placeholder
+      if (this._placeholder) {
+        this._placeholder.set({ visible: false });
+      }
+
+      // Create fabric image from the offscreen canvas
+      const dataUrl = offscreen.toDataURL('image/png');
+      fabric.Image.fromURL(dataUrl, (fImg) => {
+        fImg.set({
+          left: (nodeW - previewSize) / 2,
+          top: headerH,
+          originX: 'left',
+          originY: 'top',
+          selectable: false,
+          evented: false,
+        });
+
+        this._previewImg = fImg;
+        group.addWithUpdate(fImg);
+
+        if (canvas) canvas.renderAll();
+      });
+    };
+    imgEl.onerror = () => {
+      console.error('TilePreviewNode: failed to load image', this.connectedImage.imageUrl);
+    };
+    imgEl.src = this.connectedImage.imageUrl;
   }
 
   setGridSize(size) {
@@ -153,7 +164,7 @@ class TilePreviewNode {
       });
     }
 
-    // Connect image slot (same pattern as inpaint node)
+    // Connect image slot
     document.querySelector('[data-connect="image"]')?.addEventListener('click', () => {
       window._connectMode = { targetNodeId: this.id, connectType: 'tile-image', expects: 'image' };
       const slot = document.querySelector('[data-connect="image"]');
@@ -167,12 +178,15 @@ class TilePreviewNode {
         if (el.dataset.disconnect === 'image') {
           const oldConn = this.connectedImage;
           this.connectedImage = null;
-          // Remove tile preview visuals
-          if (this._tileGroup && this.fabricObject) {
-            const idx = this.fabricObject._objects.indexOf(this._tileGroup);
-            if (idx >= 0) this.fabricObject._objects.splice(idx, 1);
-            this._tileGroup = null;
-            this.fabricObject.canvas?.renderAll();
+          // Remove preview
+          if (this._previewImg && this.fabricObject) {
+            this.fabricObject.removeWithUpdate(this._previewImg);
+            this._previewImg = null;
+          }
+          // Show placeholder again
+          if (this._placeholder) {
+            this._placeholder.set({ visible: true });
+            this.fabricObject?.canvas?.renderAll();
           }
           if (oldConn && window._engine) window._engine.removeConnectionBetween(oldConn.nodeId, this.id);
         }
