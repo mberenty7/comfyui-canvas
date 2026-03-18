@@ -248,6 +248,72 @@ class WorkflowNode {
       }
     }
 
+    // ── Batch Group Logic ──
+    // Collect connected inputs that share a batch_group, insert ImageBatch nodes
+    const batchGroups = {};
+    for (const input of this.templateInputs) {
+      if (!input.batch_group) continue;
+      const conn = this.connectedInputs[input.name];
+      if (!conn) continue;
+      if (!batchGroups[input.batch_group]) {
+        batchGroups[input.batch_group] = {
+          inputs: [],
+          targetNode: input.batch_target_node,
+          targetField: input.batch_target_field,
+        };
+      }
+      // The LoadImage node for this input
+      batchGroups[input.batch_group].inputs.push({
+        loaderNode: input.target_node,
+        outputIndex: 0,
+      });
+    }
+
+    for (const [groupName, group] of Object.entries(batchGroups)) {
+      const connected = group.inputs.filter(i => wf[i.loaderNode]); // only nodes that weren't deleted
+      if (connected.length === 0) continue;
+
+      if (connected.length === 1) {
+        // Single image — wire directly to target
+        const targetNode = wf[group.targetNode];
+        if (targetNode) {
+          targetNode.inputs[group.targetField] = [connected[0].loaderNode, connected[0].outputIndex];
+        }
+      } else {
+        // Multiple images — chain ImageBatch nodes
+        // First pair
+        let batchCounter = 100;
+        const batchId = `batch_${groupName}_${batchCounter++}`;
+        wf[batchId] = {
+          class_type: 'ImageBatch',
+          inputs: {
+            image1: [connected[0].loaderNode, connected[0].outputIndex],
+            image2: [connected[1].loaderNode, connected[1].outputIndex],
+          },
+        };
+        let lastBatchRef = [batchId, 0];
+
+        // Chain additional images
+        for (let i = 2; i < connected.length; i++) {
+          const nextBatchId = `batch_${groupName}_${batchCounter++}`;
+          wf[nextBatchId] = {
+            class_type: 'ImageBatch',
+            inputs: {
+              image1: lastBatchRef,
+              image2: [connected[i].loaderNode, connected[i].outputIndex],
+            },
+          };
+          lastBatchRef = [nextBatchId, 0];
+        }
+
+        // Wire final batch output to target
+        const targetNode = wf[group.targetNode];
+        if (targetNode) {
+          targetNode.inputs[group.targetField] = lastBatchRef;
+        }
+      }
+    }
+
     return wf;
   }
 

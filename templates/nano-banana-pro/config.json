@@ -15,16 +15,35 @@
     {
       "name": "reference",
       "type": "image",
-      "label": "Reference Image",
+      "label": "Reference Image 1",
       "target_node": "3",
       "target_field": "image",
       "optional": true,
-      "link_output": {
-        "from_node": "3",
-        "from_output": 0,
-        "to_node": "1",
-        "to_field": "images"
-      }
+      "batch_group": "images",
+      "batch_target_node": "1",
+      "batch_target_field": "images"
+    },
+    {
+      "name": "reference2",
+      "type": "image",
+      "label": "Reference Image 2",
+      "target_node": "5",
+      "target_field": "image",
+      "optional": true,
+      "batch_group": "images",
+      "batch_target_node": "1",
+      "batch_target_field": "images"
+    },
+    {
+      "name": "reference3",
+      "type": "image",
+      "label": "Reference Image 3",
+      "target_node": "7",
+      "target_field": "image",
+      "optional": true,
+      "batch_group": "images",
+      "batch_target_node": "1",
+      "batch_target_field": "images"
     }
   ],
   "params": [
