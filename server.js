@@ -544,6 +544,68 @@ app.get('/api/comfy/mesh', async (req, res) => {
   }
 });
 
+// Save 3D model output: fetch mesh from ComfyUI, copy to output dir with rename
+app.post('/api/comfy/save-mesh', async (req, res) => {
+  try {
+    const { filename, outputName, metadata } = req.body;
+    if (!filename) return res.status(400).json({ error: 'filename required' });
+
+    const safe = path.basename(filename);
+    const ext = path.extname(safe).toLowerCase() || '.glb';
+    const outputDir = config.outputDir;
+
+    // Build output filename
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+    const baseName = outputName ? `${outputName}_${timestamp}` : `tripo_${timestamp}`;
+    const outFilename = `${baseName}${ext}`;
+
+    // Save to uploads/ dir always
+    const params = new URLSearchParams({ filename: safe, subfolder: 'mesh', type: 'output' });
+    const result = await proxyRequest('GET', '/view?' + params.toString());
+
+    if (result.status !== 200) {
+      // Try without subfolder
+      const params2 = new URLSearchParams({ filename: safe, subfolder: '', type: 'output' });
+      const result2 = await proxyRequest('GET', '/view?' + params2.toString());
+      if (result2.status !== 200) {
+        return res.status(404).json({ error: 'Mesh file not found in ComfyUI output' });
+      }
+      result.data = result2.data;
+    }
+
+    const meshBuffer = Buffer.isBuffer(result.data) ? result.data : Buffer.from(JSON.stringify(result.data));
+
+    // Save to uploads/
+    const localPath = path.join(UPLOAD_DIR, outFilename);
+    fs.writeFileSync(localPath, meshBuffer);
+    console.log(`[Mesh] Saved to ${localPath} (${(meshBuffer.length / 1024 / 1024).toFixed(1)} MB)`);
+
+    // Save to output directory if configured
+    if (outputDir) {
+      try {
+        const meshOutDir = path.join(outputDir, '3D');
+        fs.mkdirSync(meshOutDir, { recursive: true });
+        const outPath = path.join(meshOutDir, outFilename);
+        fs.writeFileSync(outPath, meshBuffer);
+        console.log(`[Mesh] Copied to output dir: ${outPath}`);
+
+        // Save sidecar metadata
+        if (metadata) {
+          const metaPath = outPath.replace(ext, '.json');
+          fs.writeFileSync(metaPath, JSON.stringify(metadata, null, 2));
+        }
+      } catch (err) {
+        console.error(`[Mesh] Failed to save to output dir: ${err.message}`);
+      }
+    }
+
+    res.json({ saved: true, filename: outFilename, localPath });
+  } catch (err) {
+    console.error('[Mesh save error]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── SAM3 Segmentation ────────────────────────
 // Run SAM3 segmentation with point prompts on an image
 app.post('/api/comfy/sam3-segment', async (req, res) => {

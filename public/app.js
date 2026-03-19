@@ -749,9 +749,13 @@ async function runGenerate(genNode) {
     for (const result of results) {
       // Handle 3D mesh outputs — open in viewer
       if (result.type === '3d' && result.meshUrl) {
-        addLog(`Opening 3D model in viewer: ${result.meshFilename}`, 'success');
+        addLog(`3D model ready: ${result.meshFilename}`, 'success');
         if (window._viewer3d) {
-          window._viewer3d.open(result.meshUrl, result.meshFilename);
+          try {
+            window._viewer3d.open(result.meshUrl, result.meshFilename);
+          } catch (err) {
+            addLog(`3D viewer error (model saved to output): ${err.message}`, 'warn');
+          }
         }
         continue;
       }

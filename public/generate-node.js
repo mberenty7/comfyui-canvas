@@ -233,6 +233,20 @@ class GenerateNode {
                   const meshUrl = `/api/comfy/mesh?filename=${encodeURIComponent(item)}`;
                   results.push({ meshUrl, meshFilename: item, seed: seeds[i], type: '3d' });
                   if (window.addLog) window.addLog(`3D model output: ${item}`, 'success');
+
+                  // Save mesh to output directory
+                  const metadata = this._buildMetadata(workflowNode, engine, seeds[i]);
+                  fetch('/api/comfy/save-mesh', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      filename: item,
+                      outputName: this.outputName || '',
+                      metadata,
+                    }),
+                  }).then(r => r.json()).then(r => {
+                    if (r.saved && window.addLog) window.addLog(`3D model saved: ${r.filename}`, 'success');
+                  }).catch(err => console.warn('Failed to save mesh:', err));
                 }
               }
             }
@@ -243,6 +257,20 @@ class GenerateNode {
                   const meshUrl = `/api/comfy/mesh?filename=${encodeURIComponent(item)}`;
                   results.push({ meshUrl, meshFilename: item, seed: seeds[i], type: '3d' });
                   if (window.addLog) window.addLog(`3D model output (text): ${item}`, 'success');
+
+                  // Save mesh to output directory
+                  const metadata = this._buildMetadata(workflowNode, engine, seeds[i]);
+                  fetch('/api/comfy/save-mesh', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      filename: item,
+                      outputName: this.outputName || '',
+                      metadata,
+                    }),
+                  }).then(r => r.json()).then(r => {
+                    if (r.saved && window.addLog) window.addLog(`3D model saved: ${r.filename}`, 'success');
+                  }).catch(err => console.warn('Failed to save mesh:', err));
                 }
               }
             }
