@@ -188,8 +188,10 @@ class GenerateNode {
         const result = await this._pollResult(data.prompt_id);
         if (result) {
           const outputs = result.outputs || {};
+          if (window.addLog) window.addLog(`Output keys: ${Object.keys(outputs).join(', ')}`, 'info');
           for (const nodeKey of Object.keys(outputs)) {
             const nodeOutput = outputs[nodeKey];
+            if (window.addLog) window.addLog(`Node ${nodeKey} output keys: ${JSON.stringify(Object.keys(nodeOutput))} | result: ${JSON.stringify(nodeOutput.result)?.substring(0,200)} | text: ${JSON.stringify(nodeOutput.text)?.substring(0,200)}`, 'info');
             if (nodeOutput.images) {
               for (const img of nodeOutput.images) {
                 const imageUrl = `/api/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder || '')}&type=output`;
@@ -209,13 +211,36 @@ class GenerateNode {
                 }).catch(err => console.warn('Failed to save output:', err));
               }
             }
-            // Handle 3D mesh outputs (e.g. Hunyuan3D Preview3D node)
+            // Handle 3D mesh outputs (e.g. Hunyuan3D Preview3D node, Tripo)
+            // Check result array
             if (nodeOutput.result && Array.isArray(nodeOutput.result)) {
               for (const item of nodeOutput.result) {
                 if (typeof item === 'string' && /\.(glb|gltf|obj|fbx)$/i.test(item)) {
                   const meshUrl = `/api/comfy/mesh?filename=${encodeURIComponent(item)}`;
                   results.push({ meshUrl, meshFilename: item, seed: seeds[i], type: '3d' });
                   if (window.addLog) window.addLog(`3D model output: ${item}`, 'success');
+                }
+              }
+            }
+            // Check text array (STRING outputs like Tripo model_file)
+            if (nodeOutput.text && Array.isArray(nodeOutput.text)) {
+              for (const item of nodeOutput.text) {
+                if (typeof item === 'string' && /\.(glb|gltf|obj|fbx)$/i.test(item)) {
+                  const meshUrl = `/api/comfy/mesh?filename=${encodeURIComponent(item)}`;
+                  results.push({ meshUrl, meshFilename: item, seed: seeds[i], type: '3d' });
+                  if (window.addLog) window.addLog(`3D model output (text): ${item}`, 'success');
+                }
+              }
+            }
+            // Check gltf/glb outputs (FILE_3D_GLB type)
+            if (nodeOutput.gltf || nodeOutput.glb) {
+              const files = [...(nodeOutput.gltf || []), ...(nodeOutput.glb || [])];
+              for (const item of files) {
+                const filename = typeof item === 'string' ? item : item?.filename;
+                if (filename) {
+                  const meshUrl = `/api/comfy/mesh?filename=${encodeURIComponent(filename)}`;
+                  results.push({ meshUrl, meshFilename: filename, seed: seeds[i], type: '3d' });
+                  if (window.addLog) window.addLog(`3D model output (glb/gltf): ${filename}`, 'success');
                 }
               }
             }
