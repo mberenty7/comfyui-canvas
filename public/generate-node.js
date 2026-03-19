@@ -165,7 +165,10 @@ class GenerateNode {
         }
 
         // Submit to ComfyUI
-        if (window.addLog) window.addLog(`Submitting workflow: ${JSON.stringify(workflow).substring(0, 1000)}`, 'info');
+        if (window.addLog) {
+          window.addLog(`Workflow nodes: ${Object.keys(workflow).join(', ')} | types: ${Object.values(workflow).map(n => n.class_type).join(', ')}`, 'info');
+          window.addLog(`Submitting workflow: ${JSON.stringify(workflow).substring(0, 1500)}`, 'info');
+        }
         const resp = await fetch('/api/comfy/prompt', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -194,7 +197,11 @@ class GenerateNode {
             window.addLog(`Full result keys: ${JSON.stringify(Object.keys(result))}`, 'info');
             window.addLog(`Outputs dump: ${JSON.stringify(outputs).substring(0, 500)}`, 'info');
             window.addLog(`Status: ${JSON.stringify(result.status)}`, 'info');
-            window.addLog(`Meta: ${JSON.stringify(result.meta)?.substring(0, 300)}`, 'info');
+            // Detect cached execution (no real outputs)
+            const isCached = result.status?.messages?.some(m => m[0] === 'execution_cached');
+            if (isCached && Object.keys(outputs).length === 0) {
+              window.addLog(`⚠️ Result was cached — no new outputs. Try changing seed or re-uploading image.`, 'warn');
+            }
           }
           for (const nodeKey of Object.keys(outputs)) {
             const nodeOutput = outputs[nodeKey];
