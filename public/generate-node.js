@@ -188,7 +188,11 @@ class GenerateNode {
         const result = await this._pollResult(data.prompt_id);
         if (result) {
           const outputs = result.outputs || {};
-          if (window.addLog) window.addLog(`Output keys: ${Object.keys(outputs).join(', ')}`, 'info');
+          if (window.addLog) {
+            window.addLog(`Output keys: ${Object.keys(outputs).join(', ')}`, 'info');
+            window.addLog(`Full result keys: ${JSON.stringify(Object.keys(result))}`, 'info');
+            window.addLog(`Outputs dump: ${JSON.stringify(outputs).substring(0, 500)}`, 'info');
+          }
           for (const nodeKey of Object.keys(outputs)) {
             const nodeOutput = outputs[nodeKey];
             if (window.addLog) window.addLog(`Node ${nodeKey} output keys: ${JSON.stringify(Object.keys(nodeOutput))} | result: ${JSON.stringify(nodeOutput.result)?.substring(0,200)} | text: ${JSON.stringify(nodeOutput.text)?.substring(0,200)}`, 'info');
