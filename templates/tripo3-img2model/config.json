@@ -1,14 +1,39 @@
 {
   "name": "Tripo 3.0 (Image → 3D)",
-  "description": "Generate a textured 3D model from an image using Tripo 3.0 API",
+  "description": "Generate a textured 3D model from one or more images using Tripo 3.0",
   "color": "#00b894",
   "inputs": [
     {
-      "name": "image",
+      "name": "image1",
       "type": "image",
-      "label": "Input Image",
+      "label": "Image 1 (Front)",
       "target_node": "2",
-      "target_field": "image"
+      "target_field": "image",
+      "batch_group": "image",
+      "batch_target_node": "1",
+      "batch_target_field": "image"
+    },
+    {
+      "name": "image2",
+      "type": "image",
+      "label": "Image 2 (Side)",
+      "target_node": "3",
+      "target_field": "image",
+      "optional": true,
+      "batch_group": "image",
+      "batch_target_node": "1",
+      "batch_target_field": "image"
+    },
+    {
+      "name": "image3",
+      "type": "image",
+      "label": "Image 3 (Back)",
+      "target_node": "4",
+      "target_field": "image",
+      "optional": true,
+      "batch_group": "image",
+      "batch_target_node": "1",
+      "batch_target_field": "image"
     }
   ],
   "params": [
@@ -17,21 +42,35 @@
       "label": "Model Version",
       "type": "select",
       "options": [
-        "v3.1-20260211",
         "v3.0-20250812",
         "v2.5-20250123",
         "v2.0-20240919"
       ],
-      "default": "v3.1-20260211",
+      "default": "v3.0-20250812",
       "target_node": "1",
       "target_field": "model_version"
+    },
+    {
+      "name": "sub_category",
+      "label": "Category",
+      "type": "select",
+      "options": [
+        "person:person2cartoon",
+        "person:person2realistic",
+        "animal",
+        "object",
+        "scene"
+      ],
+      "default": "person:person2cartoon",
+      "target_node": "1",
+      "target_field": "sub_category"
     },
     {
       "name": "texture_quality",
       "label": "Texture Quality",
       "type": "select",
       "options": ["standard", "detailed"],
-      "default": "standard",
+      "default": "detailed",
       "target_node": "1",
       "target_field": "texture_quality"
     },
@@ -49,7 +88,7 @@
       "label": "Texture Alignment",
       "type": "select",
       "options": ["original_image", "geometry"],
-      "default": "original_image",
+      "default": "geometry",
       "target_node": "1",
       "target_field": "texture_alignment"
     },
@@ -100,6 +139,6 @@
   ],
   "cost": {
     "credits": 50,
-    "note": "Tripo API (estimate, varies by quality settings)"
+    "note": "Tripo API via ComfyUI tokens"
   }
 }
