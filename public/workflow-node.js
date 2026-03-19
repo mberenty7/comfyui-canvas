@@ -108,7 +108,24 @@ class WorkflowNode {
   }
 
   // Build the final ComfyUI workflow with all params and connected inputs applied
-  buildWorkflow(engine) {
+  async buildWorkflow(engine) {
+    // Always fetch latest template workflow from server
+    if (this.templateId) {
+      try {
+        const resp = await fetch(`/api/templates/${this.templateId}`);
+        if (resp.ok) {
+          const template = await resp.json();
+          if (template.workflow) {
+            this.workflow = template.workflow;
+            // Also refresh inputs/params in case they changed
+            if (template.inputs) this.templateInputs = template.inputs;
+            if (template.params) this.templateParams = template.params;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to refresh template, using cached:', e);
+      }
+    }
     const wf = JSON.parse(JSON.stringify(this.workflow));
 
     // Apply params

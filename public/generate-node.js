@@ -155,7 +155,7 @@ class GenerateNode {
         }
 
         // Build workflow with all connections resolved
-        const workflow = workflowNode.buildWorkflow(engine);
+        const workflow = await workflowNode.buildWorkflow(engine);
 
         // Set output filename prefix on SaveImage nodes
         for (const nodeKey of Object.keys(workflow)) {
