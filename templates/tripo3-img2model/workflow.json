@@ -33,5 +33,11 @@
     "inputs": {
       "image": ""
     }
+  },
+  "5": {
+    "class_type": "Preview3D",
+    "inputs": {
+      "model_file": ["1", 0]
+    }
   }
 }
