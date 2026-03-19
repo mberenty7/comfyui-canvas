@@ -1,0 +1,31 @@
+{
+  "1": {
+    "class_type": "TripoAPIDraft",
+    "inputs": {
+      "mode": "image_to_model",
+      "image": ["2", 0],
+      "model_version": "v3.1-20260211",
+      "texture": true,
+      "pbr": true,
+      "model_seed": 42,
+      "texture_seed": 42,
+      "texture_quality": "standard",
+      "geometry_quality": "standard",
+      "texture_alignment": "original_image",
+      "face_limit": -1,
+      "quad": false,
+      "compress": false,
+      "generate_parts": false,
+      "smart_low_poly": false,
+      "auto_size": false,
+      "orientation": "default",
+      "apikey": ""
+    }
+  },
+  "2": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": ""
+    }
+  }
+}

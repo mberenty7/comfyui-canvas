@@ -1,0 +1,105 @@
+{
+  "name": "Tripo 3.0 (Image → 3D)",
+  "description": "Generate a textured 3D model from an image using Tripo 3.0 API",
+  "color": "#00b894",
+  "inputs": [
+    {
+      "name": "image",
+      "type": "image",
+      "label": "Input Image",
+      "target_node": "2",
+      "target_field": "image"
+    }
+  ],
+  "params": [
+    {
+      "name": "model_version",
+      "label": "Model Version",
+      "type": "select",
+      "options": [
+        "v3.1-20260211",
+        "v3.0-20250812",
+        "v2.5-20250123",
+        "v2.0-20240919"
+      ],
+      "default": "v3.1-20260211",
+      "target_node": "1",
+      "target_field": "model_version"
+    },
+    {
+      "name": "texture_quality",
+      "label": "Texture Quality",
+      "type": "select",
+      "options": ["standard", "detailed"],
+      "default": "standard",
+      "target_node": "1",
+      "target_field": "texture_quality"
+    },
+    {
+      "name": "geometry_quality",
+      "label": "Geometry Quality",
+      "type": "select",
+      "options": ["standard", "detailed"],
+      "default": "standard",
+      "target_node": "1",
+      "target_field": "geometry_quality"
+    },
+    {
+      "name": "texture_alignment",
+      "label": "Texture Alignment",
+      "type": "select",
+      "options": ["original_image", "geometry"],
+      "default": "original_image",
+      "target_node": "1",
+      "target_field": "texture_alignment"
+    },
+    {
+      "name": "orientation",
+      "label": "Orientation",
+      "type": "select",
+      "options": ["default", "align_image"],
+      "default": "default",
+      "target_node": "1",
+      "target_field": "orientation"
+    },
+    {
+      "name": "pbr",
+      "label": "PBR Textures",
+      "type": "select",
+      "options": ["true", "false"],
+      "default": "true",
+      "target_node": "1",
+      "target_field": "pbr"
+    },
+    {
+      "name": "face_limit",
+      "label": "Face Limit (-1 = unlimited)",
+      "type": "integer",
+      "min": -1,
+      "max": 500000,
+      "default": -1,
+      "target_node": "1",
+      "target_field": "face_limit"
+    },
+    {
+      "name": "model_seed",
+      "label": "Model Seed",
+      "type": "seed",
+      "default": 42,
+      "target_node": "1",
+      "target_field": "model_seed"
+    },
+    {
+      "name": "texture_seed",
+      "label": "Texture Seed",
+      "type": "seed",
+      "default": 42,
+      "target_node": "1",
+      "target_field": "texture_seed"
+    }
+  ],
+  "cost": {
+    "credits": 50,
+    "note": "Tripo API (estimate, varies by quality settings)"
+  }
+}
