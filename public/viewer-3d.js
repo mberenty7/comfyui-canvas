@@ -171,8 +171,45 @@ class Viewer3D {
     });
   }
 
+  _destroyThree() {
+    if (this.animId) {
+      cancelAnimationFrame(this.animId);
+      this.animId = null;
+    }
+    // Dispose current model
+    if (this.currentModel && this.scene) {
+      this.scene.remove(this.currentModel);
+      this.currentModel.traverse(c => {
+        if (c.geometry) c.geometry.dispose();
+        if (c.material) {
+          if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+          else c.material.dispose();
+        }
+      });
+      this.currentModel = null;
+    }
+    if (this.currentMaterial) {
+      this.currentMaterial.dispose();
+      this.currentMaterial = null;
+    }
+    if (this.controls) {
+      this.controls.dispose();
+      this.controls = null;
+    }
+    if (this.renderer) {
+      this.renderer.dispose();
+      this.renderer.forceContextLoss();
+      this.renderer = null;
+    }
+    this.scene = null;
+    this.camera = null;
+    this.grid = null;
+    this.clock = null;
+  }
+
   _initThree() {
-    if (this.renderer) return; // already init
+    // Always start fresh
+    this._destroyThree();
 
     const canvas = document.getElementById('viewer3d-canvas');
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -515,15 +552,19 @@ class Viewer3D {
     this.pill.classList.add('hidden');
     this.minimized = false;
 
+    // Clear any previous error
+    const errEl = document.getElementById('viewer3d-error');
+    if (errEl) errEl.textContent = '';
+
     try {
       this._initThree();
 
       // Need to resize after modal is visible
       requestAnimationFrame(() => {
         this._resize();
-        if (!this.shaderSources.vertex) {
-          this._loadShaderPreset('fresnel');
-        }
+        // Always reload shaders on fresh init
+        this.shaderSources = { vertex: '', fragment: '' };
+        this._loadShaderPreset('fresnel');
         if (modelUrl) {
           this._loadModel(modelUrl);
           document.getElementById('viewer3d-model-info').textContent = filename || 'Model';
@@ -539,10 +580,10 @@ class Viewer3D {
     this.modal.classList.add('hidden');
     this.pill.classList.add('hidden');
     this.minimized = false;
-    if (this.animId) {
-      cancelAnimationFrame(this.animId);
-      this.animId = null;
-    }
+    this._destroyThree();
+    // Clear error display
+    const errEl = document.getElementById('viewer3d-error');
+    if (errEl) errEl.textContent = '';
   }
 
   minimize() {
