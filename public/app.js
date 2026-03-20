@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   addMenu.querySelector('[data-action="viewer"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addViewerNode(); });
   addMenu.querySelector('[data-action="generate"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addGenerateNode(); });
   addMenu.querySelector('[data-action="tile-preview"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addTilePreviewNode(); });
+  addMenu.querySelector('[data-action="group-box"]').addEventListener('click', () => { addMenu.classList.add('hidden'); addGroupBox(); });
 
   document.getElementById('btn-log').addEventListener('click', toggleLog);
   document.getElementById('log-close').addEventListener('click', () => document.getElementById('log-panel').classList.add('hidden'));
@@ -517,6 +518,7 @@ function openQuickAdd() {
       else if (action === 'viewer') addViewerNode();
       else if (action === 'generate') addGenerateNode();
       else if (action === 'tile-preview') addTilePreviewNode();
+      else if (action === 'group-box') addGroupBox();
     };
   });
 
@@ -706,6 +708,15 @@ function addViewerNode() {
   const node = new ViewerNode(id);
   node.createVisual(pos.x - 90, pos.y - 35);
   engine.register(node);
+}
+
+function addGroupBox() {
+  const pos = engine.canvasCenter();
+  const id = engine.nextId();
+  const group = new GroupBox(id);
+  group.createVisual(pos.x - 200, pos.y - 150);
+  engine.register(group);
+  engine.fc.sendToBack(group.fabricObject);
 }
 
 function addTilePreviewNode() {

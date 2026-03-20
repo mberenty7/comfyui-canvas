@@ -84,9 +84,55 @@ class CanvasEngine {
       this._drawConnections();
     });
 
-    // Redraw connections when objects move
-    this.fc.on('object:moving', () => this._drawConnections());
-    this.fc.on('object:moved', () => this._drawConnections());
+    // Track group box position at start of drag
+    this.fc.on('mouse:down', (e) => {
+      if (e.target?._isGroupBox && e.target?.nodeId) {
+        const groupBox = this.nodes.get(e.target.nodeId);
+        if (groupBox) groupBox.updateLastPosition();
+      }
+    });
+
+    // Redraw connections when objects move + sticky group box movement
+    this.fc.on('object:moving', (e) => {
+      this._drawConnections();
+      // Sticky group: move child nodes with the group box
+      const obj = e.target;
+      if (obj?._isGroupBox && obj?.nodeId) {
+        const groupBox = this.nodes.get(obj.nodeId);
+        if (groupBox && groupBox.type === 'group-box') {
+          const { dx, dy } = groupBox.getMoveDelta();
+          if (dx !== 0 || dy !== 0) {
+            for (const [id, node] of this.nodes) {
+              if (node.type === 'group-box' || node.id === groupBox.id) continue;
+              if (groupBox.containsNode(node)) {
+                node.fabricObject.set({
+                  left: node.fabricObject.left + dx,
+                  top: node.fabricObject.top + dy,
+                });
+                node.fabricObject.setCoords();
+              }
+            }
+          }
+        }
+      }
+    });
+    this.fc.on('object:moved', (e) => {
+      this._drawConnections();
+      // Update group box last position after move
+      const obj = e.target;
+      if (obj?._isGroupBox && obj?.nodeId) {
+        const groupBox = this.nodes.get(obj.nodeId);
+        if (groupBox) groupBox.updateLastPosition();
+      }
+    });
+    // Handle group box resize
+    this.fc.on('object:scaled', (e) => {
+      const obj = e.target;
+      if (obj?._isGroupBox && obj?.nodeId) {
+        const groupBox = this.nodes.get(obj.nodeId);
+        if (groupBox) groupBox.updateDimensions();
+      }
+    });
   }
 
   _setupSelection() {
@@ -278,6 +324,15 @@ class CanvasEngine {
         });
         node.createVisual(n.x, n.y);
         this.register(node);
+
+      } else if (n.type === 'group-box') {
+        const node = new GroupBox(n.id, {
+          title: n.title, color: n.color,
+          width: n.width, height: n.height,
+        });
+        node.createVisual(n.x, n.y);
+        this.register(node);
+        this.fc.sendToBack(node.fabricObject);
 
       } else if (n.type === 'generate') {
         const node = new GenerateNode(n.id, {
