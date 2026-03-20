@@ -211,7 +211,13 @@ class Viewer3D {
     // Always start fresh
     this._destroyThree();
 
-    const canvas = document.getElementById('viewer3d-canvas');
+    // Replace canvas element (old one's WebGL context is dead after forceContextLoss)
+    const oldCanvas = document.getElementById('viewer3d-canvas');
+    const newCanvas = document.createElement('canvas');
+    newCanvas.id = 'viewer3d-canvas';
+    oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+
+    const canvas = newCanvas;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
