@@ -888,6 +888,205 @@ app.get('/api/image-base64', async (req, res) => {
   }
 });
 
+// ── Blockout Studio: Style Transfer Endpoint ───────────────
+
+app.post('/api/blockout/stylize', async (req, res) => {
+  try {
+    const { render, refs, prompt, model } = req.body;
+
+    if (!render) return res.status(400).json({ error: 'No render image' });
+    if (!prompt) return res.status(400).json({ error: 'No prompt' });
+
+    console.log('[Blockout] Starting stylize — model:', model, 'refs:', refs?.length || 0);
+
+    // Helper: upload base64 image to ComfyUI
+    async function uploadBase64(dataUrl, name) {
+      // Strip data URL prefix
+      const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+      const buf = Buffer.from(base64Data, 'base64');
+      const ext = dataUrl.startsWith('data:image/jpeg') ? '.jpg' : '.png';
+      const filename = `blockout_${name}_${Date.now()}${ext}`;
+
+      const boundary = '----NodeFormBoundary' + Math.random().toString(36).slice(2);
+      const mime = ext === '.jpg' ? 'image/jpeg' : 'image/png';
+
+      const bodyParts = [
+        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="${filename}"\r\nContent-Type: ${mime}\r\n\r\n`),
+        buf,
+        Buffer.from(`\r\n--${boundary}--\r\n`),
+      ];
+      const bodyBuf = Buffer.concat(bodyParts);
+
+      const url = new URL(config.comfyUrl + '/upload/image');
+      const result = await new Promise((resolve, reject) => {
+        const req = http.request({
+          hostname: url.hostname, port: url.port, path: url.pathname,
+          method: 'POST',
+          headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Content-Length': bodyBuf.length },
+        }, (resp) => {
+          let data = '';
+          resp.on('data', c => data += c);
+          resp.on('end', () => {
+            try { resolve(JSON.parse(data)); }
+            catch { reject(new Error('Upload parse failed: ' + data.substring(0, 200))); }
+          });
+        });
+        req.on('error', reject);
+        req.write(bodyBuf);
+        req.end();
+      });
+
+      console.log(`[Blockout] Uploaded ${name}: ${result.name}`);
+      return result.name;
+    }
+
+    // Upload render (always goes as first reference)
+    const renderName = await uploadBase64(render, 'render');
+
+    // Upload art direction refs
+    const refNames = [];
+    if (refs && refs.length > 0) {
+      for (let i = 0; i < refs.length; i++) {
+        const name = await uploadBase64(refs[i], `ref${i + 1}`);
+        refNames.push(name);
+      }
+    }
+
+    // All images: render first, then refs
+    const allImages = [renderName, ...refNames];
+
+    // Build workflow based on model
+    const isNanaPro = model === 'nano-banana-pro';
+    const classType = isNanaPro ? 'GeminiImage2Node' : 'GeminiImageNode';
+    const filenamePrefix = isNanaPro ? 'blockout_pro' : 'blockout';
+    const geminiModel = isNanaPro ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
+
+    const workflow = {
+      '1': {
+        class_type: classType,
+        inputs: {
+          prompt: prompt,
+          model: geminiModel,
+          seed: Math.floor(Math.random() * 2147483647),
+          aspect_ratio: 'auto',
+          response_modalities: 'IMAGE',
+          system_prompt: 'You are an expert image-generation engine specializing in style transfer and concept art. You must ALWAYS produce an image.\nThe first reference image is a 3D blockout render that defines the composition, framing, and spatial layout. Transform it using the style described in the prompt.\nIf additional reference images are provided, use them as art direction guides for color palette, mood, and artistic style.\nMaintain the composition and spatial relationships from the 3D render while applying the requested artistic transformation.',
+        },
+      },
+      '2': {
+        class_type: 'SaveImage',
+        inputs: {
+          filename_prefix: filenamePrefix,
+          images: ['1', 0],
+        },
+      },
+    };
+
+    // Add resolution for Pro
+    if (isNanaPro) {
+      workflow['1'].inputs.resolution = '1K';
+    }
+
+    // Add LoadImage nodes for each image
+    const loadNodeIds = [];
+    let nodeId = 10;
+    for (const imgName of allImages) {
+      const id = String(nodeId);
+      workflow[id] = {
+        class_type: 'LoadImage',
+        inputs: { image: imgName },
+      };
+      loadNodeIds.push(id);
+      nodeId += 2;
+    }
+
+    // Wire images to Gemini node via ImageBatch chain
+    if (loadNodeIds.length === 1) {
+      workflow['1'].inputs.images = [loadNodeIds[0], 0];
+    } else {
+      // Chain ImageBatch nodes
+      let batchCounter = 100;
+      const firstBatchId = String(batchCounter++);
+      workflow[firstBatchId] = {
+        class_type: 'ImageBatch',
+        inputs: {
+          image1: [loadNodeIds[0], 0],
+          image2: [loadNodeIds[1], 0],
+        },
+      };
+      let lastBatchRef = [firstBatchId, 0];
+
+      for (let i = 2; i < loadNodeIds.length; i++) {
+        const nextId = String(batchCounter++);
+        workflow[nextId] = {
+          class_type: 'ImageBatch',
+          inputs: {
+            image1: lastBatchRef,
+            image2: [loadNodeIds[i], 0],
+          },
+        };
+        lastBatchRef = [nextId, 0];
+      }
+
+      workflow['1'].inputs.images = lastBatchRef;
+    }
+
+    console.log('[Blockout] Workflow built, submitting...');
+
+    // Submit to ComfyUI
+    const payload = { prompt: workflow };
+    if (config.comfyApiKey) {
+      payload.extra_data = { api_key_comfy_org: config.comfyApiKey };
+    }
+
+    const submitResult = await proxyRequest('POST', '/prompt', payload);
+    if (submitResult.status !== 200 || !submitResult.data.prompt_id) {
+      throw new Error('Failed to submit workflow: ' + JSON.stringify(submitResult.data));
+    }
+
+    const promptId = submitResult.data.prompt_id;
+    console.log(`[Blockout] Submitted prompt: ${promptId}`);
+
+    // Poll for completion
+    const maxWait = 120000; // 2 minutes
+    const pollInterval = 2000;
+    const start = Date.now();
+
+    while (Date.now() - start < maxWait) {
+      await new Promise(r => setTimeout(r, pollInterval));
+
+      const histResult = await proxyRequest('GET', `/history/${promptId}`);
+      const history = histResult.data[promptId];
+
+      if (!history) continue;
+
+      if (history.status?.completed) {
+        // Find output image
+        const outputs = history.outputs;
+        for (const nodeOut of Object.values(outputs)) {
+          if (nodeOut.images && nodeOut.images.length > 0) {
+            const img = nodeOut.images[0];
+            const imageUrl = `/api/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder || '')}&type=${img.type || 'output'}`;
+
+            console.log(`[Blockout] Done! Image: ${img.filename}`);
+            return res.json({ imageUrl, filename: img.filename });
+          }
+        }
+        throw new Error('Completed but no output image found');
+      }
+
+      if (history.status?.status_str === 'error') {
+        throw new Error('ComfyUI execution failed');
+      }
+    }
+
+    throw new Error('Timed out waiting for result');
+
+  } catch (err) {
+    console.error('[Blockout] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 // ── Start ────────────────────────────────────
 
 app.listen(PORT, '0.0.0.0', () => {

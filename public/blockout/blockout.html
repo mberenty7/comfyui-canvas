@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎨</text></svg>">
+  <title>Blockout → Style Transfer</title>
+  <link rel="stylesheet" href="blockout.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <div id="header">
+      <div class="header-left">
+        <span class="logo">🎨 Blockout Studio</span>
+        <button id="btn-load-model" title="Load 3D Model">📂 Load Model</button>
+        <input type="file" id="file-input" accept=".glb,.gltf,.obj,.fbx,.usd,.usdz" hidden>
+      </div>
+      <div class="header-right">
+        <select id="model-select">
+          <option value="nano-banana">🍌 Nano Banana (15 credits)</option>
+          <option value="nano-banana-pro">🍌 Nano Banana Pro (30 credits)</option>
+        </select>
+        <span id="status">Ready</span>
+      </div>
+    </div>
+
+    <!-- Main Layout -->
+    <div id="main">
+      <!-- Viewport -->
+      <div id="viewport-panel">
+        <canvas id="viewport-canvas"></canvas>
+        <div id="dropzone">
+          <div class="dropzone-text">
+            <div class="dropzone-icon">📦</div>
+            <div>Drop 3D model here</div>
+            <div class="dropzone-formats">GLB · OBJ · FBX · USD</div>
+          </div>
+        </div>
+
+        <!-- Viewport Controls Overlay -->
+        <div id="viewport-controls">
+          <div class="control-group">
+            <label>Environment</label>
+            <select id="hdri-select">
+              <option value="studio">Studio</option>
+              <option value="outdoor">Outdoor</option>
+              <option value="overcast">Overcast</option>
+              <option value="dramatic">Dramatic</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label>Intensity</label>
+            <input type="range" id="hdri-intensity" min="0" max="3" step="0.05" value="1.0">
+            <span id="hdri-intensity-val">1.0</span>
+          </div>
+          <div class="control-group">
+            <label>Background</label>
+            <select id="bg-mode">
+              <option value="white">White</option>
+              <option value="alpha">Transparent</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div id="sidebar">
+        <!-- Prompt -->
+        <section class="sidebar-section">
+          <h3>Prompt</h3>
+          <textarea id="prompt" rows="4" placeholder="Describe the style you want... e.g. 'watercolor concept art, soft edges, warm palette'"></textarea>
+        </section>
+
+        <!-- Reference Images -->
+        <section class="sidebar-section">
+          <h3>Art Direction References</h3>
+          <div id="ref-slots">
+            <div class="ref-slot" data-slot="1">
+              <div class="ref-placeholder">Ref 1<br><span class="ref-hint">drag & drop</span></div>
+              <img class="ref-preview hidden" alt="Ref 1">
+              <button class="ref-clear hidden" title="Remove">✕</button>
+              <input type="file" accept="image/*" hidden>
+            </div>
+            <div class="ref-slot" data-slot="2">
+              <div class="ref-placeholder">Ref 2<br><span class="ref-hint">drag & drop</span></div>
+              <img class="ref-preview hidden" alt="Ref 2">
+              <button class="ref-clear hidden" title="Remove">✕</button>
+              <input type="file" accept="image/*" hidden>
+            </div>
+            <div class="ref-slot" data-slot="3">
+              <div class="ref-placeholder">Ref 3<br><span class="ref-hint">drag & drop</span></div>
+              <img class="ref-preview hidden" alt="Ref 3">
+              <button class="ref-clear hidden" title="Remove">✕</button>
+              <input type="file" accept="image/*" hidden>
+            </div>
+          </div>
+        </section>
+
+        <!-- Generate -->
+        <section class="sidebar-section">
+          <button id="btn-stylize" disabled>🎨 Stylize</button>
+        </section>
+
+        <!-- Output -->
+        <section class="sidebar-section" id="output-section">
+          <h3>Output</h3>
+          <div id="output-container">
+            <div id="output-tabs">
+              <button class="output-tab active" data-tab="stylized">Stylized</button>
+              <button class="output-tab" data-tab="render">3D Render</button>
+            </div>
+            <div id="output-image-wrap">
+              <div id="output-placeholder">Output will appear here</div>
+              <img id="output-stylized" class="output-img hidden" alt="Stylized">
+              <img id="output-render" class="output-img hidden" alt="Render">
+            </div>
+            <div id="output-actions" class="hidden">
+              <button id="btn-save-both">💾 Save Both</button>
+              <button id="btn-save-stylized">💾 Save Stylized</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="blockout.js"></script>
+</body>
+</html>
