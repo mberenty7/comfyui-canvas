@@ -216,19 +216,6 @@ async function checkComfyStatus() {
   }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-}
-
 // ── Settings ─────────────────────────────────
 
 async function openSettings() {
