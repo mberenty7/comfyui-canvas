@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥸</text></svg>">
   <title>ComfyUI Canvas</title>
-  <link rel="stylesheet" href="style.css?v=40">
+  <link rel="stylesheet" href="style.css?v=42">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 </head>
 <body>
@@ -38,6 +38,14 @@
     </div>
   </div>
 
+
+  <!-- Connection banner -->
+  <div id="connection-banner" class="hidden">
+    <span id="connection-banner-text">⚠️ Cannot reach ComfyUI</span>
+    <button id="connection-banner-settings" class="connection-banner-btn">⚙️ Settings</button>
+    <button id="connection-banner-retry" class="connection-banner-btn">🔄 Retry</button>
+    <button id="connection-banner-dismiss" class="connection-banner-close">✕</button>
+  </div>
   <canvas id="canvas"></canvas>
 
   <!-- Properties panel -->
@@ -77,7 +85,7 @@
       <h3>Settings</h3>
       <div class="prop-section">
         <label class="prop-section-label">ComfyUI URL</label>
-        <input type="text" id="settings-comfy-url" class="prop-input" placeholder="http://localhost:8188">
+        <div style="display:flex;gap:8px;align-items:center"><input type="text" id="settings-comfy-url" class="prop-input" placeholder="http://localhost:8188" style="flex:1"><button id="settings-test-connection" class="prop-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap">🔌 Test</button></div><span id="settings-connection-result" style="font-size:11px;margin-top:4px;display:block"></span>
       </div>
       <div class="prop-section">
         <label class="prop-section-label">Output Directory</label>

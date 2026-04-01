@@ -902,3 +902,53 @@ body {
   border: 1px solid var(--border);
   border-radius: 6px;
 }
+
+/* ── Connection Banner ────────────────────── */
+#connection-banner {
+  position: fixed;
+  top: 42px;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: #aa0000;
+  color: #fff;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+#connection-banner.hidden { display: none; }
+#connection-banner-text { flex: 1; }
+.connection-banner-btn {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.3);
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.connection-banner-btn:hover {
+  background: rgba(255,255,255,0.3);
+}
+.connection-banner-close {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 4px;
+}
+.connection-banner-close:hover { color: #fff; }
+
+/* Make status dot clickable */
+#comfy-status { cursor: pointer; }
+#comfy-status.disconnected { color: #ff4444; animation: pulse-dot 1.5s infinite; }
+#comfy-status.connected { color: #44ff44; }
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

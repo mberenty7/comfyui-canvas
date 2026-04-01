@@ -29,6 +29,12 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-save').addEventListener('click', saveCanvas);
   document.getElementById('btn-load').addEventListener('click', loadCanvas);
   document.getElementById('btn-settings').addEventListener('click', openSettings);
+
+  // Connection banner controls
+  document.getElementById("connection-banner-settings").addEventListener("click", openSettings);
+  document.getElementById("connection-banner-retry").addEventListener("click", checkComfyStatus);
+  document.getElementById("connection-banner-dismiss").addEventListener("click", () => document.getElementById("connection-banner").classList.add("hidden"));
+  document.getElementById("comfy-status").addEventListener("click", openSettings);
   document.getElementById('properties-close').addEventListener('click', closeProperties);
 
   engine.onNodeSelected = (node) => {
@@ -178,19 +184,49 @@ function addLog(message, type = 'info') {
 
 // ── ComfyUI Status ───────────────────────────
 
+
 async function checkComfyStatus() {
   const dot = document.getElementById('comfy-status');
+  const banner = document.getElementById('connection-banner');
+  const bannerText = document.getElementById('connection-banner-text');
   try {
+    const configResp = await fetch('/api/config');
+    const cfg = await configResp.json();
+    const comfyUrl = cfg.comfyUrl || 'http://localhost:8188';
+
     const resp = await fetch('/api/comfy/status');
     const data = await resp.json();
     dot.classList.toggle('connected', data.connected);
     dot.classList.toggle('disconnected', !data.connected);
-    dot.title = data.connected ? 'ComfyUI connected' : 'ComfyUI disconnected';
+
+    if (data.connected) {
+      dot.title = 'ComfyUI connected — ' + comfyUrl;
+      banner.classList.add('hidden');
+    } else {
+      dot.title = 'ComfyUI disconnected — ' + comfyUrl;
+      bannerText.textContent = '⚠️ Cannot reach ComfyUI at ' + comfyUrl;
+      banner.classList.remove('hidden');
+    }
   } catch {
     dot.classList.add('disconnected');
     dot.classList.remove('connected');
     dot.title = 'ComfyUI disconnected';
+    bannerText.textContent = '⚠️ Cannot reach ComfyUI — check Settings';
+    banner.classList.remove('hidden');
   }
+}
+
+
+
+
+
+
+
+
+
+
+
+
 }
 
 // ── Settings ─────────────────────────────────
@@ -225,6 +261,30 @@ async function openSettings() {
 
   document.getElementById('settings-cancel').onclick = () => modal.classList.add('hidden');
 
+
+  // Test Connection button
+  document.getElementById("settings-test-connection").onclick = async () => {
+    const result = document.getElementById("settings-connection-result");
+    const testUrl = urlInput.value.trim();
+    if (!testUrl) { result.textContent = "❌ Enter a URL first"; result.style.color = "#ff4444"; return; }
+    result.textContent = "Testing..."; result.style.color = "#888";
+    try {
+      // Save temporarily to test
+      await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ comfyUrl: testUrl }) });
+      const resp = await fetch("/api/comfy/status");
+      const data = await resp.json();
+      if (data.connected) {
+        result.textContent = "✅ Connected! ComfyUI v" + (data.system?.comfyui_version || "unknown");
+        result.style.color = "#44ff44";
+      } else {
+        result.textContent = "❌ Cannot reach ComfyUI at " + testUrl;
+        result.style.color = "#ff4444";
+      }
+    } catch (e) {
+      result.textContent = "❌ Connection failed: " + e.message;
+      result.style.color = "#ff4444";
+    }
+  };
   document.getElementById('settings-check-credits').onclick = () => {
     window.open('https://platform.comfy.org/login', '_blank');
     document.getElementById('settings-credit-result').textContent = 'Check balance on Comfy platform →';
