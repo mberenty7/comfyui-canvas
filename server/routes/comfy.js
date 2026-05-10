@@ -3,6 +3,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const { proxyRequest, uploadImageToComfy } = require('../services/comfyClient');
+const { ok, err } = require('../utils/apiResponse');
 
 module.exports = function createComfyRouter({ configRef, upload, UPLOAD_DIR }) {
   const router = express.Router();
@@ -20,13 +21,13 @@ module.exports = function createComfyRouter({ configRef, upload, UPLOAD_DIR }) {
       const mime = ext.match(/jpe?g/i) ? 'image/jpeg' : 'image/png';
       const result = await uploadImageToComfy(config.comfyUrl, localName, fileData, mime);
 
-      res.json({
+      return ok(res, {
         localPath: `/uploads/${localName}`,
         comfyName: result.name || localName,
         originalName: file.originalname,
       });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      return err(res, 'COMFY_ROUTE_ERROR', err.message, 500);
     }
   });
 
@@ -38,9 +39,9 @@ module.exports = function createComfyRouter({ configRef, upload, UPLOAD_DIR }) {
         payload.extra_data = { api_key_comfy_org: config.comfyApiKey };
       }
       const result = await proxyRequest(config.comfyUrl, 'POST', '/prompt', payload);
-      res.json(result.data);
+      return ok(res, result.data);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      return err(res, 'COMFY_ROUTE_ERROR', err.message, 500);
     }
   });
 
@@ -48,9 +49,9 @@ module.exports = function createComfyRouter({ configRef, upload, UPLOAD_DIR }) {
     try {
       const config = configRef();
       const result = await proxyRequest(config.comfyUrl, 'GET', `/history/${req.params.promptId}`);
-      res.json(result.data);
+      return ok(res, result.data);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      return err(res, 'COMFY_ROUTE_ERROR', err.message, 500);
     }
   });
 
@@ -70,11 +71,11 @@ module.exports = function createComfyRouter({ configRef, upload, UPLOAD_DIR }) {
           writeStream.end();
           const contentType = resp.headers['content-type'] || 'image/png';
           res.set('Content-Type', contentType);
-          res.send(Buffer.concat(chunks));
+          return res.send(Buffer.concat(chunks));
         });
-      }).on('error', err => res.status(500).json({ error: err.message }));
+      }).on('error', e => err(res, 'COMFY_VIEW_ERROR', e.message, 500));
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      return err(res, 'COMFY_ROUTE_ERROR', err.message, 500);
     }
   });
 
@@ -82,9 +83,9 @@ module.exports = function createComfyRouter({ configRef, upload, UPLOAD_DIR }) {
     try {
       const config = configRef();
       const result = await proxyRequest(config.comfyUrl, 'GET', '/system_stats');
-      res.json({ connected: true, ...result.data });
+      return ok(res, { connected: true, ...result.data });
     } catch (err) {
-      res.json({ connected: false, error: err.message });
+      return err(res, 'COMFY_DISCONNECTED', err.message, 200);
     }
   });
 
