@@ -2,6 +2,8 @@ const express = require('express');
 const http = require('http');
 const https = require('https');
 const { proxyRequest, uploadImageToComfy } = require('./server/services/comfyClient');
+const { listTemplates, getTemplate } = require('./server/services/templateService');
+const { applyTemplateParams, applyPromptInputs, applyDefaultSeeds, applyBatchGroups } = require('./server/services/workflowBuilder');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
@@ -57,28 +59,13 @@ app.post('/api/config', (req, res) => {
 // ── Templates ────────────────────────────────
 
 app.get('/api/templates', (req, res) => {
-  const templateDir = path.join(__dirname, 'templates');
-  const templates = [];
-  if (fs.existsSync(templateDir)) {
-    for (const name of fs.readdirSync(templateDir)) {
-      const configPath = path.join(templateDir, name, 'config.json');
-      if (fs.existsSync(configPath)) {
-        const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        templates.push({ id: name, ...cfg });
-      }
-    }
-  }
-  res.json(templates);
+  res.json(listTemplates(__dirname));
 });
 
 app.get('/api/templates/:id', (req, res) => {
-  const dir = path.join(__dirname, 'templates', req.params.id);
-  const cfgPath = path.join(dir, 'config.json');
-  const wfPath = path.join(dir, 'workflow.json');
-  if (!fs.existsSync(cfgPath)) return res.status(404).json({ error: 'Not found' });
-  const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
-  const workflow = JSON.parse(fs.readFileSync(wfPath, 'utf8'));
-  res.json({ id: req.params.id, ...cfg, workflow });
+  const t = getTemplate(__dirname, req.params.id);
+  if (!t) return res.status(404).json({ error: 'Not found' });
+  res.json(t);
 });
 
 // ── Image Upload ─────────────────────────────
@@ -877,14 +864,10 @@ app.post('/api/workflow/run', async (req, res) => {
     if (!template) return res.status(400).json({ error: 'template is required' });
 
     // Load template
-    const templateDir = path.join(__dirname, 'templates', template);
-    const cfgPath = path.join(templateDir, 'config.json');
-    const wfPath = path.join(templateDir, 'workflow.json');
-
-    if (!fs.existsSync(cfgPath)) return res.status(404).json({ error: `Template '${template}' not found` });
-
-    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
-    const workflow = JSON.parse(fs.readFileSync(wfPath, 'utf8'));
+    const loaded = getTemplate(__dirname, template);
+    if (!loaded) return res.status(404).json({ error: `Template '${template}' not found` });
+    const cfg = loaded;
+    const workflow = loaded.workflow;
 
     console.log(`[WorkflowRun] Template: ${template}, params: ${JSON.stringify(Object.keys(params))}, images: ${Object.keys(images).length}`);
 
@@ -971,43 +954,9 @@ app.post('/api/workflow/run', async (req, res) => {
     }
 
     // ── Apply params to workflow ──
-
-    // Map template params to workflow nodes
-    if (cfg.params) {
-      for (const paramDef of cfg.params) {
-        const value = params[paramDef.name];
-        if (value !== undefined && paramDef.target_node && paramDef.target_field) {
-          if (workflow[paramDef.target_node]) {
-            workflow[paramDef.target_node].inputs[paramDef.target_field] = value;
-          }
-        }
-      }
-    }
-
-    // Handle prompt (text input)
-    if (cfg.inputs) {
-      for (const inputDef of cfg.inputs) {
-        if (inputDef.type === 'prompt' && params[inputDef.name]) {
-          if (inputDef.target_positive) {
-            const { node, field } = inputDef.target_positive;
-            if (workflow[node]) {
-              workflow[node].inputs[field] = params[inputDef.name];
-            }
-          }
-        }
-      }
-    }
-
-    // Handle seed — randomize if not provided
-    if (cfg.params) {
-      for (const paramDef of cfg.params) {
-        if (paramDef.type === 'seed' && params[paramDef.name] === undefined) {
-          if (paramDef.target_node && paramDef.target_field && workflow[paramDef.target_node]) {
-            workflow[paramDef.target_node].inputs[paramDef.target_field] = Math.floor(Math.random() * 2147483647);
-          }
-        }
-      }
-    }
+    applyTemplateParams(workflow, cfg, params);
+    applyPromptInputs(workflow, cfg, params);
+    applyDefaultSeeds(workflow, cfg, params);
 
     // ── Upload and wire images ──
 
@@ -1039,60 +988,7 @@ app.post('/api/workflow/run', async (req, res) => {
     // ── Handle batch groups (e.g., Nano Banana multiple references) ──
 
     if (cfg.inputs) {
-      const batchGroups = {};
-      for (const inputDef of cfg.inputs) {
-        if (!inputDef.batch_group) continue;
-        if (!uploadedImages[inputDef.name]) continue;
-        if (!batchGroups[inputDef.batch_group]) {
-          batchGroups[inputDef.batch_group] = {
-            inputs: [],
-            targetNode: inputDef.batch_target_node,
-            targetField: inputDef.batch_target_field,
-          };
-        }
-        batchGroups[inputDef.batch_group].inputs.push({
-          loaderNode: inputDef.target_node,
-          outputIndex: 0,
-        });
-      }
-
-      for (const [groupName, group] of Object.entries(batchGroups)) {
-        const connected = group.inputs.filter(i => workflow[i.loaderNode]);
-        if (connected.length === 0) continue;
-
-        if (connected.length === 1) {
-          if (workflow[group.targetNode]) {
-            workflow[group.targetNode].inputs[group.targetField] = [connected[0].loaderNode, connected[0].outputIndex];
-          }
-        } else {
-          let batchCounter = 500;
-          const firstBatchId = `batch_${groupName}_${batchCounter++}`;
-          workflow[firstBatchId] = {
-            class_type: 'ImageBatch',
-            inputs: {
-              image1: [connected[0].loaderNode, connected[0].outputIndex],
-              image2: [connected[1].loaderNode, connected[1].outputIndex],
-            },
-          };
-          let lastBatchRef = [firstBatchId, 0];
-
-          for (let i = 2; i < connected.length; i++) {
-            const nextId = `batch_${groupName}_${batchCounter++}`;
-            workflow[nextId] = {
-              class_type: 'ImageBatch',
-              inputs: {
-                image1: lastBatchRef,
-                image2: [connected[i].loaderNode, connected[i].outputIndex],
-              },
-            };
-            lastBatchRef = [nextId, 0];
-          }
-
-          if (workflow[group.targetNode]) {
-            workflow[group.targetNode].inputs[group.targetField] = lastBatchRef;
-          }
-        }
-      }
+      applyBatchGroups(workflow, cfg, uploadedImages);
 
       // Remove unused LoadImage nodes (no image uploaded)
       for (const inputDef of cfg.inputs) {
