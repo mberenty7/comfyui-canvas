@@ -1,8 +1,10 @@
 const express = require('express');
 const fs = require('fs');
+const crypto = require('crypto');
 const { proxyRequest, uploadImageToComfy } = require('../services/comfyClient');
 const { getTemplate, listTemplates } = require('../services/templateService');
 const { applyTemplateParams, applyPromptInputs, applyDefaultSeeds, applyBatchGroups } = require('../services/workflowBuilder');
+const { ok, err } = require('../utils/apiResponse');
 
 module.exports = function createWorkflowRouter({ rootDir, configRef }) {
   const router = express.Router();
@@ -10,11 +12,13 @@ module.exports = function createWorkflowRouter({ rootDir, configRef }) {
   router.post('/api/workflow/run', async (req, res) => {
     try {
       const config = configRef();
+      const runId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
       const { template, params = {}, images = {}, wait = true, timeout = 120 } = req.body;
-      if (!template) return res.status(400).json({ error: 'template is required' });
+      console.log(`[WorkflowRun:${runId}] start template=${template}`);
+      if (!template) return err(res, 'BAD_REQUEST', 'template is required', 400);
 
       const loaded = getTemplate(rootDir, template);
-      if (!loaded) return res.status(404).json({ error: `Template '${template}' not found` });
+      if (!loaded) return err(res, 'TEMPLATE_NOT_FOUND', `Template '${template}' not found`, 404);
       const cfg = loaded;
       const workflow = loaded.workflow;
 
@@ -80,7 +84,7 @@ module.exports = function createWorkflowRouter({ rootDir, configRef }) {
         throw new Error('Failed to submit workflow: ' + JSON.stringify(submitResult.data));
       }
       const promptId = submitResult.data.prompt_id;
-      if (!wait) return res.json({ promptId, status: 'submitted' });
+      if (!wait) return ok(res, { runId, promptId, status: 'submitted' });
 
       const maxWait = (timeout || 120) * 1000;
       const start = Date.now();
@@ -91,7 +95,7 @@ module.exports = function createWorkflowRouter({ rootDir, configRef }) {
         if (!history) continue;
         if (history.status?.completed) {
           const outputs = history.outputs;
-          const result = { promptId, status: 'completed', outputs: {} };
+          const result = { runId, promptId, status: 'completed', outputs: {} };
           for (const nodeOut of Object.values(outputs)) {
             if (nodeOut.images && nodeOut.images.length > 0) {
               const img = nodeOut.images[0];
@@ -99,12 +103,12 @@ module.exports = function createWorkflowRouter({ rootDir, configRef }) {
               result.filename = img.filename;
             }
           }
-          return res.json(result);
+          return ok(res, result);
         }
       }
       throw new Error(`Timed out after ${timeout}s`);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      return err(res, 'WORKFLOW_RUN_FAILED', err.message, 500, { runId });
     }
   });
 
