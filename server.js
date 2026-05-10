@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const https = require('https');
+const { proxyRequest, uploadImageToComfy } = require('./server/services/comfyClient');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
@@ -120,36 +121,6 @@ app.post('/api/models/upload', upload.single('model'), (req, res) => {
 
 // ── ComfyUI Proxy ────────────────────────────
 
-function proxyRequest(method, urlPath, body) {
-  return new Promise((resolve, reject) => {
-    const url = new URL(config.comfyUrl + urlPath);
-    const opts = {
-      hostname: url.hostname,
-      port: url.port,
-      path: url.pathname + url.search,
-      method,
-      headers: {},
-    };
-    if (body) {
-      const data = typeof body === 'string' ? body : JSON.stringify(body);
-      opts.headers['Content-Type'] = 'application/json';
-      opts.headers['Content-Length'] = Buffer.byteLength(data);
-    }
-    const req = http.request(opts, (res) => {
-      let chunks = [];
-      res.on('data', c => chunks.push(c));
-      res.on('end', () => {
-        const buf = Buffer.concat(chunks);
-        try { resolve({ status: res.statusCode, data: JSON.parse(buf.toString()) }); }
-        catch { resolve({ status: res.statusCode, data: buf }); }
-      });
-    });
-    req.on('error', reject);
-    if (body) req.write(typeof body === 'string' ? body : JSON.stringify(body));
-    req.end();
-  });
-}
-
 // Upload image to ComfyUI
 app.post('/api/comfy/upload', upload.single('image'), async (req, res) => {
   try {
@@ -209,7 +180,7 @@ app.post('/api/comfy/prompt', async (req, res) => {
       console.log('[Prompt] No API key configured');
     }
     console.log('[Prompt] Payload keys:', JSON.stringify(Object.keys(payload)));
-    const result = await proxyRequest('POST', '/prompt', payload);
+    const result = await proxyRequest(config.comfyUrl, 'POST', '/prompt', payload);
     res.json(result.data);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -219,7 +190,7 @@ app.post('/api/comfy/prompt', async (req, res) => {
 // Poll history for a prompt
 app.get('/api/comfy/history/:promptId', async (req, res) => {
   try {
-    const result = await proxyRequest('GET', `/history/${req.params.promptId}`);
+    const result = await proxyRequest(config.comfyUrl, 'GET', `/history/${req.params.promptId}`);
     res.json(result.data);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -254,7 +225,7 @@ app.get('/api/comfy/view', async (req, res) => {
 // Check ComfyUI connectivity
 app.get('/api/comfy/status', async (req, res) => {
   try {
-    const result = await proxyRequest('GET', '/system_stats');
+    const result = await proxyRequest(config.comfyUrl, 'GET', '/system_stats');
     res.json({ connected: true, ...result.data });
   } catch (err) {
     res.json({ connected: false, error: err.message });
@@ -668,7 +639,7 @@ app.post('/api/comfy/sam3-segment', async (req, res) => {
     }
 
     // Submit workflow
-    const submitResult = await proxyRequest('POST', '/prompt', payload);
+    const submitResult = await proxyRequest(config.comfyUrl, 'POST', '/prompt', payload);
     if (!submitResult.data || !submitResult.data.prompt_id) {
       return res.status(500).json({ error: 'Failed to submit SAM3 workflow' });
     }
@@ -1141,7 +1112,7 @@ app.post('/api/workflow/run', async (req, res) => {
     }
 
     console.log(`[WorkflowRun] Submitting workflow...`);
-    const submitResult = await proxyRequest('POST', '/prompt', payload);
+    const submitResult = await proxyRequest(config.comfyUrl, 'POST', '/prompt', payload);
 
     if (submitResult.status !== 200 || !submitResult.data.prompt_id) {
       throw new Error('Failed to submit workflow: ' + JSON.stringify(submitResult.data));
@@ -1163,7 +1134,7 @@ app.post('/api/workflow/run', async (req, res) => {
     while (Date.now() - start < maxWait) {
       await new Promise(r => setTimeout(r, pollInterval));
 
-      const histResult = await proxyRequest('GET', `/history/${promptId}`);
+      const histResult = await proxyRequest(config.comfyUrl, 'GET', `/history/${promptId}`);
       const history = histResult.data[promptId];
 
       if (!history) continue;
@@ -1389,7 +1360,7 @@ app.post('/api/blockout/stylize', async (req, res) => {
       payload.extra_data = { api_key_comfy_org: config.comfyApiKey };
     }
 
-    const submitResult = await proxyRequest('POST', '/prompt', payload);
+    const submitResult = await proxyRequest(config.comfyUrl, 'POST', '/prompt', payload);
     if (submitResult.status !== 200 || !submitResult.data.prompt_id) {
       throw new Error('Failed to submit workflow: ' + JSON.stringify(submitResult.data));
     }
@@ -1405,7 +1376,7 @@ app.post('/api/blockout/stylize', async (req, res) => {
     while (Date.now() - start < maxWait) {
       await new Promise(r => setTimeout(r, pollInterval));
 
-      const histResult = await proxyRequest('GET', `/history/${promptId}`);
+      const histResult = await proxyRequest(config.comfyUrl, 'GET', `/history/${promptId}`);
       const history = histResult.data[promptId];
 
       if (!history) continue;
