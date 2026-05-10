@@ -4,6 +4,9 @@ const https = require('https');
 const { proxyRequest, uploadImageToComfy } = require('./server/services/comfyClient');
 const { listTemplates, getTemplate } = require('./server/services/templateService');
 const { applyTemplateParams, applyPromptInputs, applyDefaultSeeds, applyBatchGroups } = require('./server/services/workflowBuilder');
+const createTemplatesRouter = require('./server/routes/templates');
+const createComfyRouter = require('./server/routes/comfy');
+const createWorkflowRouter = require('./server/routes/workflow');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
@@ -44,6 +47,11 @@ app.use('/models', express.static(MODELS_DIR));
 
 const upload = multer({ dest: UPLOAD_DIR });
 
+// Phase 3 modular routes
+app.use(createTemplatesRouter(__dirname));
+app.use(createComfyRouter({ configRef: () => config, upload, UPLOAD_DIR }));
+app.use(createWorkflowRouter({ rootDir: __dirname, configRef: () => config }));
+
 // ── Config ───────────────────────────────────
 
 app.get('/api/config', (req, res) => {
@@ -58,11 +66,11 @@ app.post('/api/config', (req, res) => {
 
 // ── Templates ────────────────────────────────
 
-app.get('/api/templates', (req, res) => {
+app.get('/api/_legacy/templates', (req, res) => {
   res.json(listTemplates(__dirname));
 });
 
-app.get('/api/templates/:id', (req, res) => {
+app.get('/api/_legacy/templates/:id', (req, res) => {
   const t = getTemplate(__dirname, req.params.id);
   if (!t) return res.status(404).json({ error: 'Not found' });
   res.json(t);
@@ -109,7 +117,7 @@ app.post('/api/models/upload', upload.single('model'), (req, res) => {
 // ── ComfyUI Proxy ────────────────────────────
 
 // Upload image to ComfyUI
-app.post('/api/comfy/upload', upload.single('image'), async (req, res) => {
+app.post('/api/_legacy/comfy/upload', upload.single('image'), async (req, res) => {
   try {
     const file = req.file;
     const ext = path.extname(file.originalname) || '.png';
@@ -156,7 +164,7 @@ app.post('/api/comfy/upload', upload.single('image'), async (req, res) => {
 });
 
 // Submit workflow to ComfyUI
-app.post('/api/comfy/prompt', async (req, res) => {
+app.post('/api/_legacy/comfy/prompt', async (req, res) => {
   try {
     const payload = { prompt: req.body.workflow };
     // Include API key for partner nodes if configured
@@ -175,7 +183,7 @@ app.post('/api/comfy/prompt', async (req, res) => {
 });
 
 // Poll history for a prompt
-app.get('/api/comfy/history/:promptId', async (req, res) => {
+app.get('/api/_legacy/comfy/history/:promptId', async (req, res) => {
   try {
     const result = await proxyRequest(config.comfyUrl, 'GET', `/history/${req.params.promptId}`);
     res.json(result.data);
@@ -185,7 +193,7 @@ app.get('/api/comfy/history/:promptId', async (req, res) => {
 });
 
 // Proxy ComfyUI output images
-app.get('/api/comfy/view', async (req, res) => {
+app.get('/api/_legacy/comfy/view', async (req, res) => {
   try {
     const { filename, subfolder, type } = req.query;
     const params = new URLSearchParams({ filename, subfolder: subfolder || '', type: type || 'output' });
@@ -210,7 +218,7 @@ app.get('/api/comfy/view', async (req, res) => {
 });
 
 // Check ComfyUI connectivity
-app.get('/api/comfy/status', async (req, res) => {
+app.get('/api/_legacy/comfy/status', async (req, res) => {
   try {
     const result = await proxyRequest(config.comfyUrl, 'GET', '/system_stats');
     res.json({ connected: true, ...result.data });
@@ -812,7 +820,7 @@ app.get('/api/image-base64', async (req, res) => {
     let buf;
     if (imgUrl.startsWith('/uploads/')) {
       buf = fs.readFileSync(path.join(UPLOAD_DIR, path.basename(imgUrl)));
-    } else if (imgUrl.startsWith('/api/comfy/view')) {
+    } else if (imgUrl.startsWith('/api/_legacy/comfy/view')) {
       // Fetch from ComfyUI
       const parsed = new URL(imgUrl, 'http://localhost');
       const params = parsed.searchParams;
@@ -857,7 +865,7 @@ app.get('/api/image-base64', async (req, res) => {
 // }
 // Returns: { imageUrl, meshUrl, filename, outputs }
 
-app.post('/api/workflow/run', async (req, res) => {
+app.post('/api/_legacy/workflow/run', async (req, res) => {
   try {
     const { template, params = {}, images = {}, wait = true, timeout = 120 } = req.body;
 
@@ -1084,7 +1092,7 @@ app.post('/api/workflow/run', async (req, res) => {
 });
 
 // GET /api/workflow/templates — list available templates with their configs
-app.get('/api/workflow/templates', (req, res) => {
+app.get('/api/_legacy/workflow/templates', (req, res) => {
   const templateDir = path.join(__dirname, 'templates');
   const templates = [];
   if (fs.existsSync(templateDir)) {
