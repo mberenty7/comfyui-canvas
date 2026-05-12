@@ -48,6 +48,11 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   engine.onNodeDeselected = () => closeProperties();
 
+  // New port-wiring callback (phase 2 bridge)
+  engine.onWireConnect = (fromId, toId) => {
+    connectNodesByType(fromId, toId);
+  };
+
   // Double-click viewer or model node → open viewer
   engine.fc.on('mouse:dblclick', (e) => {
     let obj = e.target;
@@ -413,6 +418,47 @@ function showProperties(node) {
 
 function closeProperties() {
   document.getElementById('properties').classList.add('hidden');
+}
+
+
+function connectNodesByType(fromId, toId) {
+  const sourceNode = engine.nodes.get(fromId);
+  const targetNode = engine.nodes.get(toId);
+  if (!sourceNode || !targetNode) return false;
+
+  let connected = false;
+
+  if (sourceNode.type === 'workflow' && targetNode.type === 'generate') {
+    targetNode.connectedWorkflow = { nodeId: sourceNode.id };
+    connected = true;
+  } else if (sourceNode.type === 'model' && targetNode.type === 'viewer') {
+    targetNode.connectModel(sourceNode.id);
+    targetNode._updateStatus(sourceNode.filename || 'Model');
+    connected = true;
+  } else if (sourceNode.type === 'image' && targetNode.type === 'inpaint') {
+    targetNode.connectedImage = { nodeId: sourceNode.id };
+    connected = true;
+  } else if (sourceNode.type === 'prompt' && targetNode.type === 'workflow') {
+    const firstPromptInput = (targetNode.inputDefs || []).find(i => i.expects === 'prompt');
+    if (firstPromptInput && targetNode.connectInput) {
+      targetNode.connectInput(firstPromptInput.name, sourceNode.id);
+      connected = true;
+    }
+  } else if ((sourceNode.type === 'image' || sourceNode.type === 'inpaint' || sourceNode.type === 'model') && targetNode.type === 'workflow') {
+    const firstImageInput = (targetNode.inputDefs || []).find(i => i.expects === 'image');
+    if (firstImageInput && targetNode.connectInput) {
+      targetNode.connectInput(firstImageInput.name, sourceNode.id);
+      connected = true;
+    }
+  }
+
+  if (connected) {
+    engine.addConnection(sourceNode.id, targetNode.id);
+    showProperties(targetNode);
+    if (targetNode.bindProperties) targetNode.bindProperties();
+    return true;
+  }
+  return false;
 }
 
 // ── Connection System ────────────────────────
