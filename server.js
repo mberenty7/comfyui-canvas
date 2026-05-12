@@ -1,6 +1,12 @@
 const express = require('express');
 const http = require('http');
 const https = require('https');
+const { proxyRequest, uploadImageToComfy } = require('./server/services/comfyClient');
+const { listTemplates, getTemplate } = require('./server/services/templateService');
+const { applyTemplateParams, applyPromptInputs, applyDefaultSeeds, applyBatchGroups } = require('./server/services/workflowBuilder');
+const createTemplatesRouter = require('./server/routes/templates');
+const createComfyRouter = require('./server/routes/comfy');
+const createWorkflowRouter = require('./server/routes/workflow');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
@@ -41,6 +47,11 @@ app.use('/models', express.static(MODELS_DIR));
 
 const upload = multer({ dest: UPLOAD_DIR });
 
+// Phase 3 modular routes
+app.use(createTemplatesRouter(__dirname));
+app.use(createComfyRouter({ configRef: () => config, upload, UPLOAD_DIR }));
+app.use(createWorkflowRouter({ rootDir: __dirname, configRef: () => config }));
+
 // ── Config ───────────────────────────────────
 
 app.get('/api/config', (req, res) => {
@@ -51,33 +62,6 @@ app.post('/api/config', (req, res) => {
   config = { ...config, ...req.body };
   saveConfig(config);
   res.json(config);
-});
-
-// ── Templates ────────────────────────────────
-
-app.get('/api/templates', (req, res) => {
-  const templateDir = path.join(__dirname, 'templates');
-  const templates = [];
-  if (fs.existsSync(templateDir)) {
-    for (const name of fs.readdirSync(templateDir)) {
-      const configPath = path.join(templateDir, name, 'config.json');
-      if (fs.existsSync(configPath)) {
-        const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        templates.push({ id: name, ...cfg });
-      }
-    }
-  }
-  res.json(templates);
-});
-
-app.get('/api/templates/:id', (req, res) => {
-  const dir = path.join(__dirname, 'templates', req.params.id);
-  const cfgPath = path.join(dir, 'config.json');
-  const wfPath = path.join(dir, 'workflow.json');
-  if (!fs.existsSync(cfgPath)) return res.status(404).json({ error: 'Not found' });
-  const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
-  const workflow = JSON.parse(fs.readFileSync(wfPath, 'utf8'));
-  res.json({ id: req.params.id, ...cfg, workflow });
 });
 
 // ── Image Upload ─────────────────────────────
@@ -119,147 +103,6 @@ app.post('/api/models/upload', upload.single('model'), (req, res) => {
 });
 
 // ── ComfyUI Proxy ────────────────────────────
-
-function proxyRequest(method, urlPath, body) {
-  return new Promise((resolve, reject) => {
-    const url = new URL(config.comfyUrl + urlPath);
-    const opts = {
-      hostname: url.hostname,
-      port: url.port,
-      path: url.pathname + url.search,
-      method,
-      headers: {},
-    };
-    if (body) {
-      const data = typeof body === 'string' ? body : JSON.stringify(body);
-      opts.headers['Content-Type'] = 'application/json';
-      opts.headers['Content-Length'] = Buffer.byteLength(data);
-    }
-    const req = http.request(opts, (res) => {
-      let chunks = [];
-      res.on('data', c => chunks.push(c));
-      res.on('end', () => {
-        const buf = Buffer.concat(chunks);
-        try { resolve({ status: res.statusCode, data: JSON.parse(buf.toString()) }); }
-        catch { resolve({ status: res.statusCode, data: buf }); }
-      });
-    });
-    req.on('error', reject);
-    if (body) req.write(typeof body === 'string' ? body : JSON.stringify(body));
-    req.end();
-  });
-}
-
-// Upload image to ComfyUI
-app.post('/api/comfy/upload', upload.single('image'), async (req, res) => {
-  try {
-    const file = req.file;
-    const ext = path.extname(file.originalname) || '.png';
-    const localName = path.basename(file.path) + ext;
-    const localPath = file.path + ext;
-    fs.renameSync(file.path, localPath);
-
-    // Upload to ComfyUI
-    const fileData = fs.readFileSync(localPath);
-    const boundary = '----NodeFormBoundary' + Math.random().toString(36).slice(2);
-    const mime = ext.match(/jpe?g/i) ? 'image/jpeg' : 'image/png';
-
-    const bodyParts = [
-      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="${localName}"\r\nContent-Type: ${mime}\r\n\r\n`),
-      fileData,
-      Buffer.from(`\r\n--${boundary}--\r\n`),
-    ];
-    const bodyBuf = Buffer.concat(bodyParts);
-
-    const url = new URL(config.comfyUrl + '/upload/image');
-    const result = await new Promise((resolve, reject) => {
-      const req = http.request({
-        hostname: url.hostname, port: url.port, path: url.pathname,
-        method: 'POST',
-        headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Content-Length': bodyBuf.length },
-      }, (resp) => {
-        let data = '';
-        resp.on('data', c => data += c);
-        resp.on('end', () => resolve(JSON.parse(data)));
-      });
-      req.on('error', reject);
-      req.write(bodyBuf);
-      req.end();
-    });
-
-    res.json({
-      localPath: `/uploads/${localName}`,
-      comfyName: result.name || localName,
-      originalName: file.originalname,
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Submit workflow to ComfyUI
-app.post('/api/comfy/prompt', async (req, res) => {
-  try {
-    const payload = { prompt: req.body.workflow };
-    // Include API key for partner nodes if configured
-    if (config.comfyApiKey) {
-      payload.extra_data = { api_key_comfy_org: config.comfyApiKey };
-      console.log('[Prompt] Sending with API key:', config.comfyApiKey.substring(0, 12) + '...');
-    } else {
-      console.log('[Prompt] No API key configured');
-    }
-    console.log('[Prompt] Payload keys:', JSON.stringify(Object.keys(payload)));
-    const result = await proxyRequest('POST', '/prompt', payload);
-    res.json(result.data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Poll history for a prompt
-app.get('/api/comfy/history/:promptId', async (req, res) => {
-  try {
-    const result = await proxyRequest('GET', `/history/${req.params.promptId}`);
-    res.json(result.data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Proxy ComfyUI output images
-app.get('/api/comfy/view', async (req, res) => {
-  try {
-    const { filename, subfolder, type } = req.query;
-    const params = new URLSearchParams({ filename, subfolder: subfolder || '', type: type || 'output' });
-    const url = new URL(`${config.comfyUrl}/view?${params}`);
-
-    http.get(url, (resp) => {
-      // Save locally too
-      const localPath = path.join(UPLOAD_DIR, filename);
-      const writeStream = fs.createWriteStream(localPath);
-      const chunks = [];
-      resp.on('data', c => { chunks.push(c); writeStream.write(c); });
-      resp.on('end', () => {
-        writeStream.end();
-        const contentType = resp.headers['content-type'] || 'image/png';
-        res.set('Content-Type', contentType);
-        res.send(Buffer.concat(chunks));
-      });
-    }).on('error', err => res.status(500).json({ error: err.message }));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Check ComfyUI connectivity
-app.get('/api/comfy/status', async (req, res) => {
-  try {
-    const result = await proxyRequest('GET', '/system_stats');
-    res.json({ connected: true, ...result.data });
-  } catch (err) {
-    res.json({ connected: false, error: err.message });
-  }
-});
 
 // ── Sidecar metadata ─────────────────────────
 
@@ -668,7 +511,7 @@ app.post('/api/comfy/sam3-segment', async (req, res) => {
     }
 
     // Submit workflow
-    const submitResult = await proxyRequest('POST', '/prompt', payload);
+    const submitResult = await proxyRequest(config.comfyUrl, 'POST', '/prompt', payload);
     if (!submitResult.data || !submitResult.data.prompt_id) {
       return res.status(500).json({ error: 'Failed to submit SAM3 workflow' });
     }
@@ -854,7 +697,7 @@ app.get('/api/image-base64', async (req, res) => {
     let buf;
     if (imgUrl.startsWith('/uploads/')) {
       buf = fs.readFileSync(path.join(UPLOAD_DIR, path.basename(imgUrl)));
-    } else if (imgUrl.startsWith('/api/comfy/view')) {
+    } else if (imgUrl.startsWith('/api/_legacy/comfy/view')) {
       // Fetch from ComfyUI
       const parsed = new URL(imgUrl, 'http://localhost');
       const params = parsed.searchParams;
@@ -888,356 +731,6 @@ app.get('/api/image-base64', async (req, res) => {
   }
 });
 
-// ── Generic Workflow Run Endpoint ─────────────────────────
-// POST /api/workflow/run
-// {
-//   template: "nano-banana",           // template id
-//   params: { prompt: "...", ... },     // template param values
-//   images: { reference: "base64..", reference2: "base64.." },  // named image inputs as base64
-//   wait: true,                        // wait for completion (default true)
-//   timeout: 120                       // max seconds to wait (default 120)
-// }
-// Returns: { imageUrl, meshUrl, filename, outputs }
-
-app.post('/api/workflow/run', async (req, res) => {
-  try {
-    const { template, params = {}, images = {}, wait = true, timeout = 120 } = req.body;
-
-    if (!template) return res.status(400).json({ error: 'template is required' });
-
-    // Load template
-    const templateDir = path.join(__dirname, 'templates', template);
-    const cfgPath = path.join(templateDir, 'config.json');
-    const wfPath = path.join(templateDir, 'workflow.json');
-
-    if (!fs.existsSync(cfgPath)) return res.status(404).json({ error: `Template '${template}' not found` });
-
-    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
-    const workflow = JSON.parse(fs.readFileSync(wfPath, 'utf8'));
-
-    console.log(`[WorkflowRun] Template: ${template}, params: ${JSON.stringify(Object.keys(params))}, images: ${Object.keys(images).length}`);
-
-    // Helper: upload base64 image to ComfyUI
-    async function uploadBase64(dataUrl, name) {
-      let base64Data, ext;
-      if (dataUrl.startsWith('data:')) {
-        base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
-        ext = dataUrl.match(/^data:image\/(\w+)/)?.[1] === 'jpeg' ? '.jpg' : '.png';
-      } else {
-        base64Data = dataUrl;
-        ext = '.png';
-      }
-      const buf = Buffer.from(base64Data, 'base64');
-      const filename = `wfrun_${name}_${Date.now()}${ext}`;
-      const mime = ext === '.jpg' ? 'image/jpeg' : 'image/png';
-
-      const boundary = '----NodeFormBoundary' + Math.random().toString(36).slice(2);
-      const bodyParts = [
-        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="${filename}"\r\nContent-Type: ${mime}\r\n\r\n`),
-        buf,
-        Buffer.from(`\r\n--${boundary}--\r\n`),
-      ];
-      const bodyBuf = Buffer.concat(bodyParts);
-
-      const url = new URL(config.comfyUrl + '/upload/image');
-      const result = await new Promise((resolve, reject) => {
-        const req = http.request({
-          hostname: url.hostname, port: url.port, path: url.pathname,
-          method: 'POST',
-          headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Content-Length': bodyBuf.length },
-        }, (resp) => {
-          let data = '';
-          resp.on('data', c => data += c);
-          resp.on('end', () => {
-            try { resolve(JSON.parse(data)); }
-            catch { reject(new Error('Upload parse failed: ' + data.substring(0, 200))); }
-          });
-        });
-        req.on('error', reject);
-        req.write(bodyBuf);
-        req.end();
-      });
-
-      console.log(`[WorkflowRun] Uploaded ${name}: ${result.name}`);
-      return result.name;
-    }
-
-    // Upload image file from path on disk (for Houdini/CLI clients)
-    async function uploadFromPath(filePath, name) {
-      const fileData = fs.readFileSync(filePath);
-      const ext = path.extname(filePath).toLowerCase();
-      const filename = `wfrun_${name}_${Date.now()}${ext || '.png'}`;
-      const mime = ext.match(/jpe?g/i) ? 'image/jpeg' : 'image/png';
-
-      const boundary = '----NodeFormBoundary' + Math.random().toString(36).slice(2);
-      const bodyParts = [
-        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="${filename}"\r\nContent-Type: ${mime}\r\n\r\n`),
-        fileData,
-        Buffer.from(`\r\n--${boundary}--\r\n`),
-      ];
-      const bodyBuf = Buffer.concat(bodyParts);
-
-      const url = new URL(config.comfyUrl + '/upload/image');
-      const result = await new Promise((resolve, reject) => {
-        const req = http.request({
-          hostname: url.hostname, port: url.port, path: url.pathname,
-          method: 'POST',
-          headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Content-Length': bodyBuf.length },
-        }, (resp) => {
-          let data = '';
-          resp.on('data', c => data += c);
-          resp.on('end', () => {
-            try { resolve(JSON.parse(data)); }
-            catch { reject(new Error('Upload parse failed')); }
-          });
-        });
-        req.on('error', reject);
-        req.write(bodyBuf);
-        req.end();
-      });
-
-      return result.name;
-    }
-
-    // ── Apply params to workflow ──
-
-    // Map template params to workflow nodes
-    if (cfg.params) {
-      for (const paramDef of cfg.params) {
-        const value = params[paramDef.name];
-        if (value !== undefined && paramDef.target_node && paramDef.target_field) {
-          if (workflow[paramDef.target_node]) {
-            workflow[paramDef.target_node].inputs[paramDef.target_field] = value;
-          }
-        }
-      }
-    }
-
-    // Handle prompt (text input)
-    if (cfg.inputs) {
-      for (const inputDef of cfg.inputs) {
-        if (inputDef.type === 'prompt' && params[inputDef.name]) {
-          if (inputDef.target_positive) {
-            const { node, field } = inputDef.target_positive;
-            if (workflow[node]) {
-              workflow[node].inputs[field] = params[inputDef.name];
-            }
-          }
-        }
-      }
-    }
-
-    // Handle seed — randomize if not provided
-    if (cfg.params) {
-      for (const paramDef of cfg.params) {
-        if (paramDef.type === 'seed' && params[paramDef.name] === undefined) {
-          if (paramDef.target_node && paramDef.target_field && workflow[paramDef.target_node]) {
-            workflow[paramDef.target_node].inputs[paramDef.target_field] = Math.floor(Math.random() * 2147483647);
-          }
-        }
-      }
-    }
-
-    // ── Upload and wire images ──
-
-    const uploadedImages = {};
-    if (cfg.inputs) {
-      for (const inputDef of cfg.inputs) {
-        if (inputDef.type === 'image' && images[inputDef.name]) {
-          const imgData = images[inputDef.name];
-          let comfyName;
-
-          if (imgData.startsWith('/') || imgData.match(/^[A-Za-z]:\\/)) {
-            // File path — upload from disk
-            comfyName = await uploadFromPath(imgData, inputDef.name);
-          } else {
-            // Base64 data
-            comfyName = await uploadBase64(imgData, inputDef.name);
-          }
-
-          uploadedImages[inputDef.name] = comfyName;
-
-          // Set on the LoadImage node
-          if (inputDef.target_node && workflow[inputDef.target_node]) {
-            workflow[inputDef.target_node].inputs[inputDef.target_field || 'image'] = comfyName;
-          }
-        }
-      }
-    }
-
-    // ── Handle batch groups (e.g., Nano Banana multiple references) ──
-
-    if (cfg.inputs) {
-      const batchGroups = {};
-      for (const inputDef of cfg.inputs) {
-        if (!inputDef.batch_group) continue;
-        if (!uploadedImages[inputDef.name]) continue;
-        if (!batchGroups[inputDef.batch_group]) {
-          batchGroups[inputDef.batch_group] = {
-            inputs: [],
-            targetNode: inputDef.batch_target_node,
-            targetField: inputDef.batch_target_field,
-          };
-        }
-        batchGroups[inputDef.batch_group].inputs.push({
-          loaderNode: inputDef.target_node,
-          outputIndex: 0,
-        });
-      }
-
-      for (const [groupName, group] of Object.entries(batchGroups)) {
-        const connected = group.inputs.filter(i => workflow[i.loaderNode]);
-        if (connected.length === 0) continue;
-
-        if (connected.length === 1) {
-          if (workflow[group.targetNode]) {
-            workflow[group.targetNode].inputs[group.targetField] = [connected[0].loaderNode, connected[0].outputIndex];
-          }
-        } else {
-          let batchCounter = 500;
-          const firstBatchId = `batch_${groupName}_${batchCounter++}`;
-          workflow[firstBatchId] = {
-            class_type: 'ImageBatch',
-            inputs: {
-              image1: [connected[0].loaderNode, connected[0].outputIndex],
-              image2: [connected[1].loaderNode, connected[1].outputIndex],
-            },
-          };
-          let lastBatchRef = [firstBatchId, 0];
-
-          for (let i = 2; i < connected.length; i++) {
-            const nextId = `batch_${groupName}_${batchCounter++}`;
-            workflow[nextId] = {
-              class_type: 'ImageBatch',
-              inputs: {
-                image1: lastBatchRef,
-                image2: [connected[i].loaderNode, connected[i].outputIndex],
-              },
-            };
-            lastBatchRef = [nextId, 0];
-          }
-
-          if (workflow[group.targetNode]) {
-            workflow[group.targetNode].inputs[group.targetField] = lastBatchRef;
-          }
-        }
-      }
-
-      // Remove unused LoadImage nodes (no image uploaded)
-      for (const inputDef of cfg.inputs) {
-        if (inputDef.type === 'image' && inputDef.optional && !uploadedImages[inputDef.name]) {
-          if (inputDef.target_node && workflow[inputDef.target_node]) {
-            delete workflow[inputDef.target_node];
-          }
-        }
-      }
-    }
-
-    // ── Submit to ComfyUI ──
-
-    const payload = { prompt: workflow };
-    if (config.comfyApiKey) {
-      payload.extra_data = { api_key_comfy_org: config.comfyApiKey };
-    }
-
-    console.log(`[WorkflowRun] Submitting workflow...`);
-    const submitResult = await proxyRequest('POST', '/prompt', payload);
-
-    if (submitResult.status !== 200 || !submitResult.data.prompt_id) {
-      throw new Error('Failed to submit workflow: ' + JSON.stringify(submitResult.data));
-    }
-
-    const promptId = submitResult.data.prompt_id;
-    console.log(`[WorkflowRun] Submitted: ${promptId}`);
-
-    if (!wait) {
-      return res.json({ promptId, status: 'submitted' });
-    }
-
-    // ── Poll for completion ──
-
-    const maxWait = (timeout || 120) * 1000;
-    const pollInterval = 2000;
-    const start = Date.now();
-
-    while (Date.now() - start < maxWait) {
-      await new Promise(r => setTimeout(r, pollInterval));
-
-      const histResult = await proxyRequest('GET', `/history/${promptId}`);
-      const history = histResult.data[promptId];
-
-      if (!history) continue;
-
-      if (history.status?.completed) {
-        const outputs = history.outputs;
-        const result = { promptId, status: 'completed', outputs: {} };
-
-        for (const [nodeId, nodeOut] of Object.entries(outputs)) {
-          // Image outputs
-          if (nodeOut.images && nodeOut.images.length > 0) {
-            const img = nodeOut.images[0];
-            result.imageUrl = `/api/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder || '')}&type=${img.type || 'output'}`;
-            result.filename = img.filename;
-            result.outputs.images = nodeOut.images.map(i => ({
-              url: `/api/comfy/view?filename=${encodeURIComponent(i.filename)}&subfolder=${encodeURIComponent(i.subfolder || '')}&type=${i.type || 'output'}`,
-              filename: i.filename,
-            }));
-          }
-
-          // Mesh outputs (Hunyuan3D, Tripo, etc.)
-          if (nodeOut.result) {
-            const meshResult = nodeOut.result;
-            if (Array.isArray(meshResult) && meshResult.length > 0) {
-              // Check for mesh files
-              for (const item of meshResult) {
-                if (typeof item === 'string' && item.match(/\.(glb|gltf|obj|fbx|stl|usdz)$/i)) {
-                  result.meshUrl = `/api/comfy/mesh?filename=${encodeURIComponent(item)}`;
-                  result.meshFilename = item;
-                }
-              }
-            }
-          }
-        }
-
-        console.log(`[WorkflowRun] Complete: ${JSON.stringify({ imageUrl: result.imageUrl, meshUrl: result.meshUrl })}`);
-        return res.json(result);
-      }
-
-      if (history.status?.status_str === 'error') {
-        throw new Error('ComfyUI execution failed');
-      }
-    }
-
-    throw new Error(`Timed out after ${timeout}s`);
-
-  } catch (err) {
-    console.error('[WorkflowRun] Error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/workflow/templates — list available templates with their configs
-app.get('/api/workflow/templates', (req, res) => {
-  const templateDir = path.join(__dirname, 'templates');
-  const templates = [];
-  if (fs.existsSync(templateDir)) {
-    for (const name of fs.readdirSync(templateDir)) {
-      const configPath = path.join(templateDir, name, 'config.json');
-      if (fs.existsSync(configPath)) {
-        const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        templates.push({
-          id: name,
-          name: cfg.name,
-          description: cfg.description,
-          inputs: cfg.inputs,
-          params: cfg.params,
-          cost: cfg.cost,
-        });
-      }
-    }
-  }
-  res.json(templates);
-});
 // ── Blockout Studio: Style Transfer Endpoint ───────────────
 
 app.post('/api/blockout/stylize', async (req, res) => {
@@ -1389,7 +882,7 @@ app.post('/api/blockout/stylize', async (req, res) => {
       payload.extra_data = { api_key_comfy_org: config.comfyApiKey };
     }
 
-    const submitResult = await proxyRequest('POST', '/prompt', payload);
+    const submitResult = await proxyRequest(config.comfyUrl, 'POST', '/prompt', payload);
     if (submitResult.status !== 200 || !submitResult.data.prompt_id) {
       throw new Error('Failed to submit workflow: ' + JSON.stringify(submitResult.data));
     }
@@ -1405,7 +898,7 @@ app.post('/api/blockout/stylize', async (req, res) => {
     while (Date.now() - start < maxWait) {
       await new Promise(r => setTimeout(r, pollInterval));
 
-      const histResult = await proxyRequest('GET', `/history/${promptId}`);
+      const histResult = await proxyRequest(config.comfyUrl, 'GET', `/history/${promptId}`);
       const history = histResult.data[promptId];
 
       if (!history) continue;
