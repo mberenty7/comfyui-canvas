@@ -6,18 +6,25 @@
   <title>Flow Canvas v2</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reactflow@11.11.4/dist/style.css">
   <style>
-    html,body,#root{margin:0;height:100%;background:#1a1a2e;color:#e0e0e0;font-family:system-ui}
+    :root{--bg:#1a1a2e;--panel:#13192f;--line:#2f3550;--text:#e0e0e0;--muted:#9aa4c7}
+    html,body,#root{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui}
+    .page{height:100%;display:grid;grid-template-rows:48px 1fr}
+    .toolbar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);background:#0f1426}
+    .toolbar .sp{flex:1}
     .layout{display:grid;grid-template-columns:1fr 320px;height:100%}
-    .sidebar{border-left:1px solid #2f3550;background:#13192f;padding:12px;overflow:auto}
-    .node{background:#1f2438;border:1px solid #48506a;border-radius:8px;min-width:220px}
+    .sidebar{border-left:1px solid var(--line);background:var(--panel);padding:12px;overflow:auto}
+    .node{background:#1f2438;border:1px solid #48506a;border-radius:8px;min-width:230px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
     .head{padding:8px 10px;font-weight:600;border-bottom:1px solid #3a4158}
     .body{padding:8px 10px;font-size:12px;color:#b8bfd9}
     .prompt{border-color:#b86e00}.image{border-color:#6a4fb8}.workflow{border-color:#1b5e20}.generate{border-color:#1565c0}
+    .react-flow__node.selected .node{outline:1px solid #fff3}
     .react-flow__handle{width:10px;height:10px}.h-text{background:#ffb74d}.h-image{background:#ba68c8}.h-workflow{background:#4fc3f7}
     .btn{background:#2b3558;color:#e0e0e0;border:1px solid #4a567f;padding:6px 10px;border-radius:6px;cursor:pointer}
+    .btn:hover{background:#34406a}
     .row{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
     input,select,textarea{width:100%;background:#0f1426;color:#e0e0e0;border:1px solid #334;padding:6px;border-radius:6px}
-    .log{font-family:ui-monospace,monospace;font-size:11px;white-space:pre-wrap;color:#9ab;max-height:180px;overflow:auto;background:#0d1120;border:1px solid #2f3550;padding:8px;border-radius:6px}
+    .log{font-family:ui-monospace,monospace;font-size:11px;white-space:pre-wrap;color:#9ab;max-height:180px;overflow:auto;background:#0d1120;border:1px solid var(--line);padding:8px;border-radius:6px}
+    .muted{color:var(--muted);font-size:12px}
   </style>
   <script type="importmap">
   {
@@ -34,6 +41,6 @@
 </head>
 <body>
   <div id="root"></div>
-  <script type="module" src="./flow-canvas-v2.js?v=1"></script>
+  <script type="module" src="./flow-canvas-v2.js?v=2"></script>
 </body>
 </html>
