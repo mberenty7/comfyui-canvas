@@ -12,6 +12,8 @@ class CanvasEngine {
     this.connections = []; // { fromId, toId }
     this.nodeIdCounter = 0;
     this.selectedNode = null;
+    this.nodePorts = new Map(); // nodeId -> {in?:circle,out?:circle}
+    this._wireDrag = null;
 
     this.onNodeSelected = null;
     this.onNodeDeselected = null;
@@ -149,6 +151,8 @@ class CanvasEngine {
         if (border) { border.set('stroke', this.selectedNode._origStroke || '#444'); this.fc.renderAll(); }
       }
       this.selectedNode = null;
+    this.nodePorts = new Map(); // nodeId -> {in?:circle,out?:circle}
+    this._wireDrag = null;
       if (this.onNodeDeselected) this.onNodeDeselected();
     });
   }
@@ -280,57 +284,6 @@ class CanvasEngine {
 
   _updateAllPorts() {
     for (const [id,node] of this.nodes) this._updatePortsForNode(node);
-  }
-
-
-  _findPortAtPoint(x, y, side = null) {
-    const r2 = 10 * 10;
-    for (const [id, ports] of this.nodePorts) {
-      for (const k of ['in', 'out']) {
-        const port = ports[k];
-        if (!port) continue;
-        if (side && k !== side) continue;
-        const dx = port.left - x;
-        const dy = port.top - y;
-        if (dx * dx + dy * dy <= r2) return { nodeId: id, side: k, port };
-      }
-    }
-    return null;
-  }
-
-  _setupPortWiring() {
-    this.fc.on('mouse:down', (e) => {
-      if (!e.e || e.e.button !== 0) return;
-      const pt = this.fc.getPointer(e.e);
-      const hit = this._findPortAtPoint(pt.x, pt.y, 'out');
-      if (!hit) return;
-      const line = new fabric.Line([hit.port.left, hit.port.top, pt.x, pt.y], { stroke:'#88a', strokeWidth:2, selectable:false, evented:false, _isTempWire:true });
-      this.fc.add(line);
-      this._wireDrag = { fromNodeId: hit.nodeId, line };
-      this.fc.renderAll();
-    });
-
-    this.fc.on('mouse:move', (e) => {
-      if (!this._wireDrag) return;
-      const pt = this.fc.getPointer(e.e);
-      this._wireDrag.line.set({ x2: pt.x, y2: pt.y });
-      const hit = this._findPortAtPoint(pt.x, pt.y, 'in');
-      for (const [,ports] of this.nodePorts) if (ports.in) ports.in.set('stroke', '#9bb');
-      if (hit && hit.port) hit.port.set('stroke', '#fff');
-      this.fc.requestRenderAll();
-    });
-
-    this.fc.on('mouse:up', (e) => {
-      if (!this._wireDrag) return;
-      const pt = this.fc.getPointer(e.e);
-      const hit = this._findPortAtPoint(pt.x, pt.y, 'in');
-      const fromId = this._wireDrag.fromNodeId;
-      this.fc.remove(this._wireDrag.line);
-      this._wireDrag = null;
-      for (const [,ports] of this.nodePorts) if (ports.in) ports.in.set('stroke', '#9bb');
-      if (hit && hit.nodeId && hit.nodeId !== fromId && this.onWireConnect) this.onWireConnect(fromId, hit.nodeId);
-      this.fc.requestRenderAll();
-    });
   }
 
   // ── Serialize / Deserialize ────────────────
