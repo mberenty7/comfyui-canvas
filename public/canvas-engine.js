@@ -13,6 +13,7 @@ class CanvasEngine {
     this.nodeIdCounter = 0;
     this.selectedNode = null;
     this.nodePorts = new Map(); // nodeId -> {in?:circle,out?:circle}
+    this._wireDrag = null;
 
     this.onNodeSelected = null;
     this.onNodeDeselected = null;
@@ -20,6 +21,7 @@ class CanvasEngine {
     this._resize();
     this._setupPanZoom();
     this._setupSelection();
+    this._setupPortWiring();
     window.addEventListener('resize', () => this._resize());
   }
 
@@ -150,6 +152,7 @@ class CanvasEngine {
       }
       this.selectedNode = null;
     this.nodePorts = new Map(); // nodeId -> {in?:circle,out?:circle}
+    this._wireDrag = null;
       if (this.onNodeDeselected) this.onNodeDeselected();
     });
   }
