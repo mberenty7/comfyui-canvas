@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flow Canvas Spike</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reactflow@11.11.4/dist/style.css">
+  <style>
+    html,body,#root{margin:0;height:100%;background:#1a1a2e;color:#e0e0e0;font-family:system-ui}
+    .node{background:#1f2438;border:1px solid #48506a;border-radius:8px;min-width:180px}
+    .head{padding:8px 10px;font-weight:600;border-bottom:1px solid #3a4158}
+    .body{padding:8px 10px;font-size:12px;color:#b8bfd9}
+    .prompt{border-color:#b86e00}.workflow{border-color:#1b5e20}.generate{border-color:#1565c0}
+    .react-flow__handle{width:10px;height:10px}
+    .h-text{background:#ffb74d}.h-image{background:#ba68c8}.h-workflow{background:#4fc3f7}
+    .topbar{position:fixed;top:8px;left:8px;z-index:20;background:#101426;padding:8px 10px;border:1px solid #2f3550;border-radius:8px;font-size:12px}
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@18.3.1",
+      "react/": "https://esm.sh/react@18.3.1/",
+      "react-dom": "https://esm.sh/react-dom@18.3.1",
+      "react-dom/": "https://esm.sh/react-dom@18.3.1/",
+      "reactflow": "https://esm.sh/reactflow@11.11.4?external=react,react-dom",
+      "htm": "https://esm.sh/htm@3.1.1"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="./flow-canvas.js"></script>
+</body>
+</html>
