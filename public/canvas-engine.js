@@ -13,18 +13,25 @@ class CanvasEngine {
     this.nodeIdCounter = 0;
     this.selectedNode = null;
 
+    // Phase 1: port-to-port wiring state
+    this._portVisuals = [];
+    this._wireDrag = null; // { fromNodeId, fromPort, line }
+    this.onWireConnect = null;
+
     this.onNodeSelected = null;
     this.onNodeDeselected = null;
 
     this._resize();
     this._setupPanZoom();
     this._setupSelection();
+    this._setupPortWiring();
     window.addEventListener('resize', () => this._resize());
   }
 
   _resize() {
     this.fc.setWidth(window.innerWidth);
     this.fc.setHeight(window.innerHeight - 48);
+    this._drawPorts();
     this.fc.renderAll();
   }
 
@@ -65,6 +72,7 @@ class CanvasEngine {
       last = { x: e.e.clientX, y: e.e.clientY };
       this.fc.requestRenderAll();
       this._drawConnections();
+      this._drawPorts();
     });
 
     this.fc.on('mouse:up', () => {
@@ -82,6 +90,7 @@ class CanvasEngine {
       e.e.stopPropagation();
       this._updateZoom();
       this._drawConnections();
+      this._drawPorts();
     });
 
     // Track group box position at start of drag
@@ -95,6 +104,7 @@ class CanvasEngine {
     // Redraw connections when objects move + sticky group box movement
     this.fc.on('object:moving', (e) => {
       this._drawConnections();
+      this._drawPorts();
       // Sticky group: move child nodes with the group box
       const obj = e.target;
       if (obj?._isGroupBox && obj?.nodeId) {
@@ -118,6 +128,7 @@ class CanvasEngine {
     });
     this.fc.on('object:moved', (e) => {
       this._drawConnections();
+      this._drawPorts();
       // Update group box last position after move
       const obj = e.target;
       if (obj?._isGroupBox && obj?.nodeId) {
@@ -144,6 +155,11 @@ class CanvasEngine {
         if (border) { border.set('stroke', this.selectedNode._origStroke || '#444'); this.fc.renderAll(); }
       }
       this.selectedNode = null;
+
+    // Phase 1: port-to-port wiring state
+    this._portVisuals = [];
+    this._wireDrag = null; // { fromNodeId, fromPort, line }
+    this.onWireConnect = null;
       if (this.onNodeDeselected) this.onNodeDeselected();
     });
   }
@@ -185,6 +201,7 @@ class CanvasEngine {
       this.connections.push({ fromId, toId });
       if (window._scheduleAutosave) window._scheduleAutosave();
       this._drawConnections();
+      this._drawPorts();
     }
   }
 
@@ -227,6 +244,7 @@ class CanvasEngine {
       this.fc.add(path);
       this.fc.sendToBack(path);
     }
+    this._drawPorts();
     this.fc.renderAll();
   }
 
@@ -365,6 +383,7 @@ class CanvasEngine {
   register(node) {
     this.nodes.set(node.id, node);
     this.fc.add(node.fabricObject);
+    this._drawPorts();
     this.fc.renderAll();
   }
 
