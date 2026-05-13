@@ -200,8 +200,9 @@ async function checkComfyStatus() {
     const comfyUrl = cfg.comfyUrl || 'http://localhost:8188';
 
     const resp = await fetch('/api/comfy/status');
-    const data = await resp.json();
-    dot.classList.toggle('connected', data.connected);
+    const raw = await resp.json();
+    const data = (raw && typeof raw === 'object' && 'ok' in raw) ? (raw.data || {}) : raw;
+    dot.classList.toggle('connected', !!data.connected);
     dot.classList.toggle('disconnected', !data.connected);
 
     if (data.connected) {
@@ -264,7 +265,8 @@ async function openSettings() {
       // Save temporarily to test
       await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ comfyUrl: testUrl }) });
       const resp = await fetch("/api/comfy/status");
-      const data = await resp.json();
+      const raw2 = await resp.json();
+      const data = (raw2 && typeof raw2 === 'object' && 'ok' in raw2) ? (raw2.data || {}) : raw2;
       if (data.connected) {
         result.textContent = "✅ Connected! ComfyUI v" + (data.system?.comfyui_version || "unknown");
         result.style.color = "#44ff44";
