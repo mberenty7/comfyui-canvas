@@ -12,6 +12,7 @@ class CanvasEngine {
     this.connections = []; // { fromId, toId }
     this.nodeIdCounter = 0;
     this.selectedNode = null;
+    this.nodePorts = new Map(); // nodeId -> {in?:circle,out?:circle}
 
     this.onNodeSelected = null;
     this.onNodeDeselected = null;
@@ -65,6 +66,7 @@ class CanvasEngine {
       last = { x: e.e.clientX, y: e.e.clientY };
       this.fc.requestRenderAll();
       this._drawConnections();
+      this._updateAllPorts();
     });
 
     this.fc.on('mouse:up', () => {
@@ -82,6 +84,7 @@ class CanvasEngine {
       e.e.stopPropagation();
       this._updateZoom();
       this._drawConnections();
+      this._updateAllPorts();
     });
 
     // Track group box position at start of drag
@@ -95,6 +98,7 @@ class CanvasEngine {
     // Redraw connections when objects move + sticky group box movement
     this.fc.on('object:moving', (e) => {
       this._drawConnections();
+      this._updateAllPorts();
       // Sticky group: move child nodes with the group box
       const obj = e.target;
       if (obj?._isGroupBox && obj?.nodeId) {
@@ -118,6 +122,7 @@ class CanvasEngine {
     });
     this.fc.on('object:moved', (e) => {
       this._drawConnections();
+      this._updateAllPorts();
       // Update group box last position after move
       const obj = e.target;
       if (obj?._isGroupBox && obj?.nodeId) {
@@ -144,6 +149,7 @@ class CanvasEngine {
         if (border) { border.set('stroke', this.selectedNode._origStroke || '#444'); this.fc.renderAll(); }
       }
       this.selectedNode = null;
+    this.nodePorts = new Map(); // nodeId -> {in?:circle,out?:circle}
       if (this.onNodeDeselected) this.onNodeDeselected();
     });
   }
@@ -185,6 +191,7 @@ class CanvasEngine {
       this.connections.push({ fromId, toId });
       if (window._scheduleAutosave) window._scheduleAutosave();
       this._drawConnections();
+      this._updateAllPorts();
     }
   }
 
@@ -228,6 +235,52 @@ class CanvasEngine {
       this.fc.sendToBack(path);
     }
     this.fc.renderAll();
+  }
+
+
+  _portSpecForType(type) {
+    const hasInput = ['workflow','generate','viewer','inpaint','tile-preview'].includes(type);
+    const hasOutput = ['prompt','image','workflow','model','inpaint'].includes(type);
+    return { hasInput, hasOutput };
+  }
+
+  _portPos(node, side) {
+    const g = node.fabricObject;
+    const c = g.getCenterPoint();
+    const w = g.getScaledWidth();
+    return { x: side === 'in' ? c.x - w/2 - 7 : c.x + w/2 + 7, y: c.y };
+  }
+
+  _createPortsForNode(node) {
+    const spec = this._portSpecForType(node.type);
+    if (!spec.hasInput && !spec.hasOutput) return;
+    const ports = {};
+    const mk=(side)=>{
+      const pos=this._portPos(node,side);
+      return new fabric.Circle({
+        left: pos.x, top: pos.y, radius: 4.5, originX:'center', originY:'center',
+        fill: side==='in' ? '#2a3f66' : '#3a6640', stroke:'#9bb', strokeWidth:1,
+        selectable:false, evented:false, excludeFromExport:true, _isPort:true
+      });
+    };
+    if (spec.hasInput) ports.in = mk('in');
+    if (spec.hasOutput) ports.out = mk('out');
+    if (ports.in) this.fc.add(ports.in);
+    if (ports.out) this.fc.add(ports.out);
+    this.nodePorts.set(node.id, ports);
+    if (ports.in) this.fc.bringToFront(ports.in);
+    if (ports.out) this.fc.bringToFront(ports.out);
+  }
+
+  _updatePortsForNode(node) {
+    const ports = this.nodePorts.get(node.id);
+    if (!ports) return;
+    if (ports.in) { const p=this._portPos(node,'in'); ports.in.set({left:p.x, top:p.y}); }
+    if (ports.out) { const p=this._portPos(node,'out'); ports.out.set({left:p.x, top:p.y}); }
+  }
+
+  _updateAllPorts() {
+    for (const [id,node] of this.nodes) this._updatePortsForNode(node);
   }
 
   // ── Serialize / Deserialize ────────────────
@@ -365,6 +418,7 @@ class CanvasEngine {
   register(node) {
     this.nodes.set(node.id, node);
     this.fc.add(node.fabricObject);
+    this._createPortsForNode(node);
     this.fc.renderAll();
   }
 
