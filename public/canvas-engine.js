@@ -304,8 +304,6 @@ class CanvasEngine {
       const pt = this.fc.getPointer(e.e);
       const hit = this._findPortAtPoint(pt.x, pt.y, 'out');
       if (!hit) return;
-      this.fc.selection = false;
-      this.fc.defaultCursor = 'crosshair';
       const line = new fabric.Line([hit.port.left, hit.port.top, pt.x, pt.y], { stroke:'#88a', strokeWidth:2, selectable:false, evented:false, _isTempWire:true });
       this.fc.add(line);
       this._wireDrag = { fromNodeId: hit.nodeId, line };
@@ -314,7 +312,6 @@ class CanvasEngine {
 
     this.fc.on('mouse:move', (e) => {
       if (!this._wireDrag) return;
-      if (e.e && e.e.preventDefault) e.e.preventDefault();
       const pt = this.fc.getPointer(e.e);
       this._wireDrag.line.set({ x2: pt.x, y2: pt.y });
       const hit = this._findPortAtPoint(pt.x, pt.y, 'in');
@@ -325,14 +322,11 @@ class CanvasEngine {
 
     this.fc.on('mouse:up', (e) => {
       if (!this._wireDrag) return;
-      if (e.e && e.e.preventDefault) e.e.preventDefault();
       const pt = this.fc.getPointer(e.e);
       const hit = this._findPortAtPoint(pt.x, pt.y, 'in');
       const fromId = this._wireDrag.fromNodeId;
       this.fc.remove(this._wireDrag.line);
       this._wireDrag = null;
-      this.fc.selection = true;
-      this.fc.defaultCursor = 'default';
       for (const [,ports] of this.nodePorts) if (ports.in) ports.in.set('stroke', '#9bb');
       if (hit && hit.nodeId && hit.nodeId !== fromId && this.onWireConnect) this.onWireConnect(fromId, hit.nodeId);
       this.fc.requestRenderAll();
