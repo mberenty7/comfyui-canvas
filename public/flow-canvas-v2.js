@@ -67,7 +67,7 @@ function InnerApp() {
       <button className="btn" onClick=${()=>{setShowPromptLib(v=>!v); setShowImageLib(false);}}>Prompt Library</button>
       <span className="muted">Zoom ${zoom}%</span>
     </div>
-    <div className="layout" style=${{ gridTemplateColumns: ((showImageLib || showPromptLib) && selected) ? "320px 1fr 320px" : ((showImageLib || showPromptLib) ? "320px 1fr 0px" : (selected ? "0px 1fr 320px" : "0px 1fr 0px")) }}>
+    <div className="layout">
       <div className=${'leftbar ' + ((!showImageLib && !showPromptLib) ? 'hidden' : '')}>
         ${showImageLib ? html`<h3>Image Library</h3><div className="muted">Library panel scaffold (P2: wire to /api/gallery)</div>` : null}
         ${showPromptLib ? html`<h3>Prompt Library</h3><div className="muted">Library panel scaffold (P2: wire to /api/prompts)</div>` : null}
