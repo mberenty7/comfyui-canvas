@@ -67,11 +67,11 @@ function InnerApp() {
       <button className="btn" onClick=${()=>{setShowPromptLib(v=>!v); setShowImageLib(false);}}>Prompt Library</button>
       <span className="muted">Zoom ${zoom}%</span>
     </div>
-    <div className="layout">
-      <div className=${'leftbar ' + ((!showImageLib && !showPromptLib) ? 'hidden' : '')}>
+    <div className="layout" style=${{ gridTemplateColumns: (!showImageLib && !showPromptLib && !selected) ? '1fr' : ((showImageLib || showPromptLib) && selected) ? '320px 1fr 320px' : ((showImageLib || showPromptLib) ? '320px 1fr' : '1fr 320px') }}>
+      ${ (showImageLib || showPromptLib) ? html`<div className="leftbar">` : null }
         ${showImageLib ? html`<h3>Image Library</h3><div className="muted">Library panel scaffold (P2: wire to /api/gallery)</div>` : null}
         ${showPromptLib ? html`<h3>Prompt Library</h3><div className="muted">Library panel scaffold (P2: wire to /api/prompts)</div>` : null}
-      </div>
+      ${ (showImageLib || showPromptLib) ? html`</div>` : null }
       <div>
         <${ReactFlow} nodes=${nodes} edges=${edges} nodeTypes=${nodeTypes}
           onNodesChange=${onNodesChange} onEdgesChange=${onEdgesChange}
@@ -85,13 +85,13 @@ function InnerApp() {
           <${Background} gap=${20} color="#3a4f43" />
         </${ReactFlow}>
       </div>
-      <div className=${'sidebar ' + ((!selected) ? 'hidden' : '')}>
+      ${ selected ? html`<div className="sidebar">` : null }
         ${selected ? html`<h3 style=${{margin:'6px 0'}}>Selected: ${selected.type}</h3>
           ${selected.type==='prompt' ? html`<textarea rows="4" value=${selected.data.text||''} onChange=${e=>updateSelected({text:e.target.value})}></textarea>` : null}
           ${selected.type==='workflow' ? html`<select value=${selected.data.templateId||''} onChange=${e=>{const t=templates.find(x=>x.id===e.target.value); updateSelected({templateId:e.target.value,templateName:t?.name||e.target.value});}}>${templates.map(t=>html`<option value=${t.id}>${t.name||t.id}</option>`)}</select>` : null}
           ${selected.type==='image' ? html`<input type="file" accept="image/*" onChange=${e=>{const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>updateSelected({filename:f.name,dataUrl:r.result}); r.readAsDataURL(f);}} />` : null}
         ` : null}
-      </div>
+      ${ selected ? html`</div>` : null }
     </div>
 
     ${menu ? html`<div className="menu" style=${{left:menu.x+'px',top:menu.y+'px'}}>
