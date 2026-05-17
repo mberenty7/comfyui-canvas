@@ -68,7 +68,7 @@ function InnerApp() {
       <span className="muted">Zoom ${zoom}%</span>
     </div>
     <div className="layout">
-      <div className="leftbar ${(!showImageLib && !showPromptLib) ? 'hidden' : ''}">
+      <div className=${'leftbar ' + ((!showImageLib && !showPromptLib) ? 'hidden' : '')}>
         ${showImageLib ? html`<h3>Image Library</h3><div className="muted">Library panel scaffold (P2: wire to /api/gallery)</div>` : null}
         ${showPromptLib ? html`<h3>Prompt Library</h3><div className="muted">Library panel scaffold (P2: wire to /api/prompts)</div>` : null}
       </div>
@@ -85,7 +85,7 @@ function InnerApp() {
           <${Background} gap=${20} color="#3a4f43" />
         </${ReactFlow}>
       </div>
-      <div className="sidebar ${(!selected) ? 'hidden' : ''}>
+      <div className=${'sidebar ' + ((!selected) ? 'hidden' : '')}>
         ${selected ? html`<h3 style=${{margin:'6px 0'}}>Selected: ${selected.type}</h3>
           ${selected.type==='prompt' ? html`<textarea rows="4" value=${selected.data.text||''} onChange=${e=>updateSelected({text:e.target.value})}></textarea>` : null}
           ${selected.type==='workflow' ? html`<select value=${selected.data.templateId||''} onChange=${e=>{const t=templates.find(x=>x.id===e.target.value); updateSelected({templateId:e.target.value,templateName:t?.name||e.target.value});}}>${templates.map(t=>html`<option value=${t.id}>${t.name||t.id}</option>`)}</select>` : null}
