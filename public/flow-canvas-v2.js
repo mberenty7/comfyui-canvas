@@ -44,6 +44,7 @@ function InnerApp() {
     };
     const onUp = () => {
       setResizing(false);
+      document.body.style.userSelect='';
       localStorage.setItem('flow-v2-prop-width', String(propWidth));
     };
     window.addEventListener('mousemove', onMove);
