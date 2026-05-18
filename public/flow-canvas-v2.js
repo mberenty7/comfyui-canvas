@@ -28,12 +28,29 @@ function InnerApp() {
   const [showLog, setShowLog] = useState(false);
   const [showImageLib, setShowImageLib] = useState(false);
   const [showPromptLib, setShowPromptLib] = useState(false);
+  const [propWidth, setPropWidth] = useState(() => Number(localStorage.getItem('flow-v2-prop-width')||320));
+  const [resizing, setResizing] = useState(false);
   const [menu, setMenu] = useState(null);
 
   const nodesById = useMemo(() => Object.fromEntries(nodes.map(n => [n.id, n])), [nodes]);
   const selected = nodes.find(n => n.id === selectedId) || null;
 
   useEffect(() => { (async()=>{ try { const r=await fetch('/api/templates'); const j=await r.json(); setTemplates(j.ok?(j.data||[]):(Array.isArray(j)?j:[])); } catch {} })(); }, []);
+  useEffect(() => {
+    if (!resizing) return;
+    const onMove = (e) => {
+      const w = Math.max(240, Math.min(520, window.innerWidth - e.clientX));
+      setPropWidth(w);
+    };
+    const onUp = () => {
+      setResizing(false);
+      localStorage.setItem('flow-v2-prop-width', String(propWidth));
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp, { once: true });
+    return () => { window.removeEventListener('mousemove', onMove); };
+  }, [resizing, propWidth]);
+
   useEffect(()=>{const onKey=(e)=>{ if(e.key==='Tab' && !e.target.closest('input,textarea,select')){ e.preventDefault(); setMenu({x:window.innerWidth/2-100,y:80}); }}; window.addEventListener('keydown',onKey); return ()=>window.removeEventListener('keydown',onKey);},[]);
 
   const isValidConnection = useCallback((c)=>{ const s=nodesById[c.source], t=nodesById[c.target]; if(!s||!t) return false; const ot=outType[s.type], et=inType[t.type]?.[c.targetHandle||'']; if(!ot||!et||ot!==et) return false; if(edges.some(e=>e.target===c.target&&e.targetHandle===c.targetHandle)) return false; return true; },[nodesById,edges]);
@@ -67,7 +84,7 @@ function InnerApp() {
       <button className="btn" onClick=${()=>{setShowPromptLib(v=>!v); setShowImageLib(false);}}>Prompt Library</button>
       <span className="muted">Zoom ${zoom}%</span>
     </div>
-    <div className="layout">
+    <div className="layout" style=${{ gridTemplateColumns: selected ? `1fr ${propWidth}px` : "1fr 0px" }}>
       <div className=${'leftbar ' + ((!showImageLib && !showPromptLib) ? 'hidden' : '')}>
         ${showImageLib ? html`<h3>Image Library</h3><div className="muted">Library panel scaffold (P2: wire to /api/gallery)</div>` : null}
         ${showPromptLib ? html`<h3>Prompt Library</h3><div className="muted">Library panel scaffold (P2: wire to /api/prompts)</div>` : null}
