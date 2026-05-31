@@ -64,13 +64,25 @@ function InnerApp() {
   const updateSelected = useCallback((patch)=>{ if(!selectedId) return; setNodes(nds=>nds.map(n=>n.id===selectedId?({...n,data:{...n.data,...patch}}):n)); },[selectedId,setNodes]);
 
 
-  const onSplitbarPointerDown = useCallback((e) => {
+  const onSidebarPointerDown = useCallback((e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const nearEdge = (e.clientX - rect.left) <= 12;
+    if (!nearEdge) return;
     e.preventDefault();
     e.stopPropagation();
     setDbg('pointerdown');
     setResizing(true);
     document.body.style.userSelect = 'none';
     document.body.style.cursor = 'col-resize';
+  }, []);
+
+
+  const onSidebarPointerMove = useCallback((e) => {
+    const el = e.currentTarget;
+    const rect = el.getBoundingClientRect();
+    const nearEdge = (e.clientX - rect.left) <= 12;
+    if (nearEdge) el.classList.add('edge-hover');
+    else el.classList.remove('edge-hover');
   }, []);
 
   const runGenerate = useCallback(async()=>{
