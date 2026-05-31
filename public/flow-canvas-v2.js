@@ -60,7 +60,7 @@ function InnerApp() {
 
   const isValidConnection = useCallback((c)=>{ const s=nodesById[c.source], t=nodesById[c.target]; if(!s||!t) return false; const ot=outType[s.type], et=inType[t.type]?.[c.targetHandle||'']; if(!ot||!et||ot!==et) return false; if(edges.some(e=>e.target===c.target&&e.targetHandle===c.targetHandle)) return false; return true; },[nodesById,edges]);
   const onConnect = useCallback((p)=>{ if(!isValidConnection(p)) return; setEdges(eds=>addEdge({...p,animated:true,style:{stroke:'#9ed6ff'}},eds)); },[isValidConnection,setEdges]);
-  const addNode = useCallback((type,pos)=>{ const c=pos?rf.screenToFlowPosition(pos):rf.screenToFlowPosition({x:280,y:220}); const n={id:uid(type[0]),type,position:c,data:{}}; if(type==='prompt')n.data.text='new prompt'; if(type==='workflow')n.data={templateId:'txt2img',templateName:'txt2img'}; if(type==='generate')n.data={status:'Ready'}; setNodes(nds=>[...nds,n]); setMenu(null); },[rf,setNodes]);
+  const addNode = useCallback((type,pos)=>{ const c = { x: (pos?.x || 280), y: (pos?.y || 220) }; const n={id:uid(type[0]),type,position:c,data:{}}; if(type==='prompt')n.data.text='new prompt'; if(type==='workflow')n.data={templateId:'txt2img',templateName:'txt2img'}; if(type==='generate')n.data={status:'Ready'}; setNodes(nds=>[...nds,n]); setMenu(null); },[setNodes]);
   const updateSelected = useCallback((patch)=>{ if(!selectedId) return; setNodes(nds=>nds.map(n=>n.id===selectedId?({...n,data:{...n.data,...patch}}):n)); },[selectedId,setNodes]);
 
 
