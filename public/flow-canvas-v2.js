@@ -64,7 +64,7 @@ function InnerApp() {
   const updateSelected = useCallback((patch)=>{ if(!selectedId) return; setNodes(nds=>nds.map(n=>n.id===selectedId?({...n,data:{...n.data,...patch}}):n)); },[selectedId,setNodes]);
 
 
-  const onResizerPointerDown = useCallback((e) => {
+  const onSplitbarPointerDown = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
     setDbg('pointerdown');
