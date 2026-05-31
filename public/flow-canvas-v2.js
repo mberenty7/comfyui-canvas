@@ -30,6 +30,7 @@ function InnerApp() {
   const [showPromptLib, setShowPromptLib] = useState(false);
   const [propWidth, setPropWidth] = useState(() => Number(localStorage.getItem('flow-v2-prop-width')||320));
   const [resizing, setResizing] = useState(false);
+  const [dbg, setDbg] = useState('idle');
   const [menu, setMenu] = useState(null);
 
   const nodesById = useMemo(() => Object.fromEntries(nodes.map(n => [n.id, n])), [nodes]);
@@ -40,10 +41,10 @@ function InnerApp() {
     if (!resizing) return;
     const onMove = (e) => {
       const w = Math.max(240, Math.min(520, window.innerWidth - e.clientX));
-      setPropWidth(w);
+      setDbg('dragging ' + w); setPropWidth(w);
     };
     const onUp = () => {
-      setResizing(false);
+      setDbg('mouseup'); setResizing(false);
       document.body.style.userSelect='';
       document.body.style.cursor='';
       localStorage.setItem('flow-v2-prop-width', String(propWidth));
@@ -68,7 +69,7 @@ function InnerApp() {
     if (edgeDist > 12) return;
     e.preventDefault();
     e.stopPropagation();
-    setResizing(true);
+    setDbg('mousedown edge'); setResizing(true);
     document.body.style.userSelect = 'none';
     document.body.style.cursor = 'col-resize';
   }, []);
@@ -97,7 +98,7 @@ function InnerApp() {
       <button className="btn" onClick=${()=>setShowLog(v=>!v)}>Log</button>
       <button className="btn" onClick=${()=>{setShowImageLib(v=>!v); setShowPromptLib(false);}}>Image Library</button>
       <button className="btn" onClick=${()=>{setShowPromptLib(v=>!v); setShowImageLib(false);}}>Prompt Library</button>
-      <span className="muted">Zoom ${zoom}%</span>
+      <button className="btn" onClick=${()=>setPropWidth(w=>Math.max(240,w-20))}>Prop -</button><button className="btn" onClick=${()=>setPropWidth(w=>Math.min(520,w+20))}>Prop +</button><span className="muted">Prop ${propWidth}px · ${dbg} · Zoom ${zoom}%</span>
     </div>
     <div className="layout" style=${{ gridTemplateColumns: selected ? `1fr ${propWidth}px` : "1fr 0px" }}>
       <div className=${'leftbar ' + ((!showImageLib && !showPromptLib) ? 'hidden' : '')}>
