@@ -1,37 +1,3 @@
-
-// Temporary runtime error overlay
-(function setupErrorOverlay(){
-  const show = (msg) => {
-    let el = document.getElementById('runtime-error-overlay');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'runtime-error-overlay';
-      el.style.position = 'fixed';
-      el.style.left = '10px';
-      el.style.right = '10px';
-      el.style.bottom = '10px';
-      el.style.zIndex = '999999';
-      el.style.background = 'rgba(120,0,0,.95)';
-      el.style.color = '#fff';
-      el.style.padding = '10px';
-      el.style.border = '1px solid #f88';
-      el.style.borderRadius = '8px';
-      el.style.fontFamily = 'ui-monospace,monospace';
-      el.style.fontSize = '12px';
-      el.style.whiteSpace = 'pre-wrap';
-      document.body.appendChild(el);
-    }
-    el.textContent = msg;
-  };
-  window.addEventListener('error', (e) => {
-    show('Runtime Error: ' + (e.message || 'unknown') + '
-' + (e.filename || '') + ':' + (e.lineno || '') + ':' + (e.colno || ''));
-  });
-  window.addEventListener('unhandledrejection', (e) => {
-    show('Unhandled Rejection: ' + ((e.reason && (e.reason.stack || e.reason.message)) || String(e.reason)));
-  });
-})();
-
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import ReactFlow, { Background, Controls, Handle, Position, addEdge, useNodesState, useEdgesState, ReactFlowProvider, useReactFlow } from 'reactflow';
