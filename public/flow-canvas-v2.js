@@ -50,8 +50,10 @@ function InnerApp() {
       localStorage.setItem('flow-v2-prop-width', String(propWidth));
     };
     window.addEventListener('mousemove', onMove);
+    window.addEventListener('pointermove', onMove);
     window.addEventListener('mouseup', onUp, { once: true });
-    return () => { window.removeEventListener('mousemove', onMove); };
+    window.addEventListener('pointerup', onUp, { once: true });
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('pointermove', onMove); };
   }, [resizing, propWidth]);
 
   useEffect(()=>{const onKey=(e)=>{ if(e.key==='Tab' && !e.target.closest('input,textarea,select')){ e.preventDefault(); setMenu({x:window.innerWidth/2-100,y:80}); }}; window.addEventListener('keydown',onKey); return ()=>window.removeEventListener('keydown',onKey);},[]);
@@ -62,14 +64,11 @@ function InnerApp() {
   const updateSelected = useCallback((patch)=>{ if(!selectedId) return; setNodes(nds=>nds.map(n=>n.id===selectedId?({...n,data:{...n.data,...patch}}):n)); },[selectedId,setNodes]);
 
 
-  const onSidebarMouseDown = useCallback((e) => {
-    // only start resize if near left edge of properties panel (10px zone)
-    const rect = e.currentTarget.getBoundingClientRect();
-    const edgeDist = e.clientX - rect.left;
-    if (edgeDist > 12) return;
+  const onResizerPointerDown = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-    setDbg('mousedown edge'); setResizing(true);
+    setDbg('pointerdown');
+    setResizing(true);
     document.body.style.userSelect = 'none';
     document.body.style.cursor = 'col-resize';
   }, []);
