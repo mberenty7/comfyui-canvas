@@ -45,6 +45,7 @@ function InnerApp() {
     const onUp = () => {
       setResizing(false);
       document.body.style.userSelect='';
+      document.body.style.cursor='';
       localStorage.setItem('flow-v2-prop-width', String(propWidth));
     };
     window.addEventListener('mousemove', onMove);
@@ -58,6 +59,19 @@ function InnerApp() {
   const onConnect = useCallback((p)=>{ if(!isValidConnection(p)) return; setEdges(eds=>addEdge({...p,animated:true,style:{stroke:'#9ed6ff'}},eds)); },[isValidConnection,setEdges]);
   const addNode = useCallback((type,pos)=>{ const c=pos?rf.screenToFlowPosition(pos):rf.screenToFlowPosition({x:280,y:220}); const n={id:uid(type[0]),type,position:c,data:{}}; if(type==='prompt')n.data.text='new prompt'; if(type==='workflow')n.data={templateId:'txt2img',templateName:'txt2img'}; if(type==='generate')n.data={status:'Ready'}; setNodes(nds=>[...nds,n]); setMenu(null); },[rf,setNodes]);
   const updateSelected = useCallback((patch)=>{ if(!selectedId) return; setNodes(nds=>nds.map(n=>n.id===selectedId?({...n,data:{...n.data,...patch}}):n)); },[selectedId,setNodes]);
+
+
+  const onSidebarMouseDown = useCallback((e) => {
+    // only start resize if near left edge of properties panel (10px zone)
+    const rect = e.currentTarget.getBoundingClientRect();
+    const edgeDist = e.clientX - rect.left;
+    if (edgeDist > 12) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setResizing(true);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+  }, []);
 
   const runGenerate = useCallback(async()=>{
     const gen = nodes.find(n=>n.type==='generate'); if(!gen){setLog('No generate node'); setShowLog(true); return;}
