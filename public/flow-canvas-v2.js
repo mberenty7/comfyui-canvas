@@ -28,7 +28,7 @@ function InnerApp() {
   const [showLog, setShowLog] = useState(false);
   const [showImageLib, setShowImageLib] = useState(false);
   const [showPromptLib, setShowPromptLib] = useState(false);
-  const [propWidth, setPropWidth] = useState(() => Number(localStorage.getItem('flow-v2-prop-width')||320));
+  const [propWidth, setPropWidth] = useState(320);
   const [resizing, setResizing] = useState(false);
   const [dbg, setDbg] = useState('idle');
   const [menu, setMenu] = useState(null);
@@ -38,7 +38,7 @@ function InnerApp() {
 
   useEffect(() => { (async()=>{ try { const r=await fetch('/api/templates'); const j=await r.json(); setTemplates(j.ok?(j.data||[]):(Array.isArray(j)?j:[])); } catch {} })(); }, []);
   useEffect(() => {
-    if (!resizing) return;
+    if (true) return;
     const onMove = (e) => {
       const w = Math.max(240, Math.min(520, window.innerWidth - e.clientX));
       setDbg('dragging ' + w); setPropWidth(w);
@@ -109,9 +109,9 @@ function InnerApp() {
       <button className="btn" onClick=${()=>setShowLog(v=>!v)}>Log</button>
       <button className="btn" onClick=${()=>{setShowImageLib(v=>!v); setShowPromptLib(false);}}>Image Library</button>
       <button className="btn" onClick=${()=>{setShowPromptLib(v=>!v); setShowImageLib(false);}}>Prompt Library</button>
-      <button className="btn" onClick=${()=>setPropWidth(w=>Math.max(240,w-20))}>Prop -</button><button className="btn" onClick=${()=>setPropWidth(w=>Math.min(520,w+20))}>Prop +</button><span className="muted">Prop ${propWidth}px · ${dbg} · Zoom ${zoom}%</span>
+      <span className="muted">Zoom ${zoom}%</span>
     </div>
-    <div className="layout" style=${{ gridTemplateColumns: selected ? `1fr ${propWidth}px` : "1fr 0px" }}>
+    <div className="layout">
       <div className=${'leftbar ' + ((!showImageLib && !showPromptLib) ? 'hidden' : '')}>
         ${showImageLib ? html`<h3>Image Library</h3><div className="muted">Library panel scaffold (P2: wire to /api/gallery)</div>` : null}
         ${showPromptLib ? html`<h3>Prompt Library</h3><div className="muted">Library panel scaffold (P2: wire to /api/prompts)</div>` : null}
