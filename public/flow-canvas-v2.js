@@ -116,7 +116,7 @@ function InnerApp() {
         ${showImageLib ? html`<h3>Image Library</h3><div className="muted">Library panel scaffold (P2: wire to /api/gallery)</div>` : null}
         ${showPromptLib ? html`<h3>Prompt Library</h3><div className="muted">Library panel scaffold (P2: wire to /api/prompts)</div>` : null}
       </div>
-      <div>
+      <div style=${{ height: "100%" }}>
         <${ReactFlow} nodes=${nodes} edges=${edges} nodeTypes=${nodeTypes}
           onNodesChange=${onNodesChange} onEdgesChange=${onEdgesChange}
           onConnect=${onConnect} isValidConnection=${isValidConnection}
