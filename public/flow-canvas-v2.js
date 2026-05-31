@@ -30,8 +30,7 @@ function InnerApp() {
   const [showPromptLib, setShowPromptLib] = useState(false);
   const [propWidth, setPropWidth] = useState(320);
   const [resizing, setResizing] = useState(false);
-  const [dbg, setDbg] = useState('idle');
-  const [menu, setMenu] = useState(null);
+    const [menu, setMenu] = useState(null);
 
   const nodesById = useMemo(() => Object.fromEntries(nodes.map(n => [n.id, n])), [nodes]);
   const selected = nodes.find(n => n.id === selectedId) || null;
@@ -109,9 +108,9 @@ function InnerApp() {
       <button className="btn" onClick=${()=>setShowLog(v=>!v)}>Log</button>
       <button className="btn" onClick=${()=>{setShowImageLib(v=>!v); setShowPromptLib(false);}}>Image Library</button>
       <button className="btn" onClick=${()=>{setShowPromptLib(v=>!v); setShowImageLib(false);}}>Prompt Library</button>
-      <span className="muted">Zoom ${zoom}%</span>
+      <span className="muted">Props ${propWidth}px · Zoom ${zoom}%</span>
     </div>
-    <div className="layout">
+    <div className="layout" style=${{ gridTemplateColumns: selected ? `1fr ${propWidth}px` : "1fr 0px" }}>
       <div className=${'leftbar ' + ((!showImageLib && !showPromptLib) ? 'hidden' : '')}>
         ${showImageLib ? html`<h3>Image Library</h3><div className="muted">Library panel scaffold (P2: wire to /api/gallery)</div>` : null}
         ${showPromptLib ? html`<h3>Prompt Library</h3><div className="muted">Library panel scaffold (P2: wire to /api/prompts)</div>` : null}
