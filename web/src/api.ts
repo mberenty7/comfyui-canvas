@@ -18,3 +18,19 @@ export async function apiGet<T = unknown>(url: string): Promise<T> {
   const resp = await fetch(url);
   return unwrap<T>(await resp.json());
 }
+
+/** POST JSON and return the unwrapped payload. */
+export async function apiPost<T = unknown>(url: string, body: unknown): Promise<T> {
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return unwrap<T>(await resp.json());
+}
+
+/** POST a FormData (file upload) and return the unwrapped payload. */
+export async function apiUpload<T = unknown>(url: string, form: FormData): Promise<T> {
+  const resp = await fetch(url, { method: 'POST', body: form });
+  return unwrap<T>(await resp.json());
+}

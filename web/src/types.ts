@@ -65,8 +65,24 @@ export interface WorkflowNodeData {
   [key: string]: unknown;
 }
 
+export interface GenerateNodeData {
+  label: string;
+  count: number;
+  seedMode: 'increment' | 'random' | 'fixed';
+  baseSeed: number;
+  outputName: string;
+  connectedWorkflow?: { nodeId: string } | null;
+  [key: string]: unknown;
+}
+
+/** Transient run state for a Generate node (not serialized). */
+export interface GenStatus {
+  state: 'idle' | 'running' | 'done' | 'error';
+  text: string;
+}
+
 /** Output port "type" a node emits, used for connection validation. */
-export type PortType = 'image' | 'prompt';
+export type PortType = 'image' | 'prompt' | 'workflow';
 
 export type GenericNodeData = Record<string, unknown>;
 

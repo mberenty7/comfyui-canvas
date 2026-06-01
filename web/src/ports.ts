@@ -11,18 +11,22 @@ interface ConnectionLike {
 
 /** Stable id for a node's single output handle. */
 export const OUTPUT_HANDLE = 'out';
+/** The single workflow-input handle on a Generate node. */
+export const WORKFLOW_HANDLE = 'workflow';
 
 /**
  * The port type a node emits from its output handle. Mirrors the legacy
- * connection rules in app.js `handleConnect` (image-producing nodes emit
- * 'image'; prompt nodes emit 'prompt').
+ * connection rules in app.js `handleConnect`: prompt nodes emit 'prompt',
+ * image-producing nodes emit 'image', and a workflow node emits 'workflow'
+ * (it only feeds a Generate node).
  */
 export function outputType(node: Node): PortType | null {
   switch (node.type) {
     case 'prompt':
       return 'prompt';
-    case 'image':
     case 'workflow':
+      return 'workflow';
+    case 'image':
     case 'inpaint':
     case 'model':
       return 'image';
@@ -37,6 +41,9 @@ export function inputType(node: Node, handleId: string | null | undefined): Port
     const data = node.data as WorkflowNodeData;
     const input = data.inputs?.find((i) => i.name === handleId);
     return input ? input.type : null;
+  }
+  if (node.type === 'generate' && handleId === WORKFLOW_HANDLE) {
+    return 'workflow';
   }
   return null;
 }

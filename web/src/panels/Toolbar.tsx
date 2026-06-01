@@ -22,6 +22,15 @@ export function Toolbar() {
     addNode('prompt', { label: '', positive: '', negative: '' }, { x: c.x - 80, y: c.y - 25 });
   }
 
+  function addGenerate() {
+    const c = center();
+    addNode(
+      'generate',
+      { label: '', count: 1, seedMode: 'increment', baseSeed: Math.floor(Math.random() * 999999), outputName: 'canvas_output', connectedWorkflow: null },
+      { x: c.x - 80, y: c.y - 30 },
+    );
+  }
+
   function addImage() {
     const input = document.createElement('input');
     input.type = 'file';
@@ -98,6 +107,7 @@ export function Toolbar() {
         <button onClick={addPrompt}>✏️ Prompt</button>
         <button onClick={addImage}>📷 Image</button>
         <button onClick={() => setPickerOpen(true)}>⚙️ Workflow</button>
+        <button onClick={addGenerate}>▶ Generate</button>
         <button onClick={saveCanvas}>💾 Save</button>
         <button onClick={loadCanvas}>📂 Load</button>
         <span className="cv-toolbar-note">React Flow preview</span>

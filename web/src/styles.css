@@ -66,6 +66,20 @@ body,
   font-family: monospace;
   margin-top: 2px;
 }
+.cv-node-generate {
+  border-color: #4caf50;
+  width: 160px;
+  position: relative;
+}
+.cv-node-status {
+  font-size: 9px;
+  color: #888;
+  font-family: monospace;
+  margin-top: 6px;
+}
+.cv-handle-generate {
+  background: #4caf50;
+}
 .cv-input-row {
   display: none;
 }

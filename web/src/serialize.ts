@@ -1,6 +1,6 @@
 import type { Node, Edge } from '@xyflow/react';
 import type { CanvasFileV2, LegacyNode } from './types';
-import { OUTPUT_HANDLE } from './ports';
+import { OUTPUT_HANDLE, WORKFLOW_HANDLE } from './ports';
 
 /**
  * Keys that live at the top level of a legacy node object and therefore must
@@ -43,6 +43,9 @@ export function fromCanvasFormat(data: CanvasFileV2): DeserializeResult {
     if (target?.type === 'workflow') {
       const connectedInputs = (target.connectedInputs ?? {}) as Record<string, { nodeId: string }>;
       targetHandle = Object.keys(connectedInputs).find((k) => connectedInputs[k]?.nodeId === c.fromId);
+    } else if (target?.type === 'generate') {
+      const cw = target.connectedWorkflow as { nodeId: string } | null | undefined;
+      if (cw?.nodeId === c.fromId) targetHandle = WORKFLOW_HANDLE;
     }
     return {
       id: `e_${c.fromId}_${c.toId}_${targetHandle ?? 'def'}`,
@@ -90,6 +93,9 @@ export function toCanvasFormat(nodes: Node[], edges: Edge[], meta: SerializeMeta
     for (const k of RESERVED_KEYS) delete safeData[k];
     if (n.type === 'workflow') {
       safeData.connectedInputs = connectedInputsByNode.get(n.id) ?? {};
+    } else if (n.type === 'generate') {
+      const wfEdge = edges.find((e) => e.target === n.id && e.targetHandle === WORKFLOW_HANDLE);
+      safeData.connectedWorkflow = wfEdge ? { nodeId: wfEdge.source } : null;
     }
     return {
       id: n.id,

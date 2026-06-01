@@ -10,7 +10,7 @@ import {
   type Connection,
 } from '@xyflow/react';
 import { fromCanvasFormat, toCanvasFormat } from './serialize';
-import type { CanvasFileV2 } from './types';
+import type { CanvasFileV2, GenStatus } from './types';
 
 interface CanvasState {
   nodes: Node[];
@@ -19,6 +19,8 @@ interface CanvasState {
   zoom: number;
   viewport: { x: number; y: number };
   selectedId: string | null;
+  /** Transient per-Generate-node run status (not persisted). */
+  genStatus: Record<string, GenStatus>;
 
   // React Flow change handlers
   onNodesChange: (changes: NodeChange[]) => void;
@@ -35,6 +37,8 @@ interface CanvasState {
   updateNodeData: (id: string, patch: Record<string, unknown>) => void;
   deleteNode: (id: string) => void;
   disconnectInput: (targetId: string, handle: string) => void;
+  addResultEdge: (source: string, target: string) => void;
+  setGenStatus: (id: string, status: GenStatus) => void;
 
   // Persistence (legacy v2 compatible)
   serialize: () => CanvasFileV2;
@@ -48,6 +52,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   zoom: 1,
   viewport: { x: 0, y: 0 },
   selectedId: null,
+  genStatus: {},
 
   onNodesChange: (changes) => {
     set({ nodes: applyNodeChanges(changes, get().nodes) });
@@ -102,6 +107,14 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({
       edges: get().edges.filter((e) => !(e.target === targetId && e.targetHandle === handle)),
     });
+  },
+
+  addResultEdge: (source, target) => {
+    set({ edges: [...get().edges, { id: `e_${source}_${target}_def`, source, sourceHandle: 'out', target, targetHandle: null }] });
+  },
+
+  setGenStatus: (id, status) => {
+    set({ genStatus: { ...get().genStatus, [id]: status } });
   },
 
   serialize: () => {

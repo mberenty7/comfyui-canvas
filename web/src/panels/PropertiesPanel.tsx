@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCanvasStore } from '../store';
-import type { ImageNodeData, PromptNodeData, TemplateParam, WorkflowNodeData } from '../types';
+import { runGenerate } from '../generate';
+import { WORKFLOW_HANDLE } from '../ports';
+import type { GenerateNodeData, ImageNodeData, PromptNodeData, TemplateParam, WorkflowNodeData } from '../types';
 
 const WIDTH_KEY = 'cv-properties-width';
 const MIN_WIDTH = 240;
@@ -69,7 +71,8 @@ export function PropertiesPanel() {
         )}
         {node.type === 'image' && <ImageProperties id={node.id} data={node.data as ImageNodeData} onChange={updateNodeData} />}
         {node.type === 'workflow' && <WorkflowProperties id={node.id} data={node.data as WorkflowNodeData} onChange={updateNodeData} />}
-        {!['prompt', 'image', 'workflow'].includes(node.type ?? '') && (
+        {node.type === 'generate' && <GenerateProperties id={node.id} data={node.data as GenerateNodeData} onChange={updateNodeData} />}
+        {!['prompt', 'image', 'workflow', 'generate'].includes(node.type ?? '') && (
           <div className="prop-section">
             <label className="prop-section-label">Type</label>
             <div className="prop-value">{node.type}</div>
@@ -346,6 +349,110 @@ function ParamControl({
         onChange={(e) => onChange(numeric ? Number(e.target.value) : e.target.value)}
       />
     </div>
+  );
+}
+
+function GenerateProperties({
+  id,
+  data,
+  onChange,
+}: {
+  id: string;
+  data: GenerateNodeData;
+  onChange: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  const edges = useCanvasStore((s) => s.edges);
+  const disconnectInput = useCanvasStore((s) => s.disconnectInput);
+  const status = useCanvasStore((s) => s.genStatus[id]);
+  const running = status?.state === 'running';
+  const connected = edges.some((e) => e.target === id && e.targetHandle === WORKFLOW_HANDLE);
+
+  return (
+    <>
+      <div className="prop-section">
+        <label className="prop-section-label">Label</label>
+        <input
+          type="text"
+          className="prop-input"
+          value={data.label ?? ''}
+          placeholder="e.g. Batch Run"
+          onChange={(e) => onChange(id, { label: e.target.value })}
+        />
+      </div>
+      <div className="prop-section">
+        <label className="prop-section-label">Output Name</label>
+        <input
+          type="text"
+          className="prop-input"
+          value={data.outputName ?? ''}
+          placeholder="e.g. paranorman_style"
+          onChange={(e) => onChange(id, { outputName: e.target.value })}
+        />
+      </div>
+      <div className="prop-section">
+        <label className="prop-section-label">⚙️ Workflow</label>
+        <div className="workflow-input-slot" style={{ color: connected ? '#4caf50' : '#888' }}>
+          {connected ? '✅ Connected' : "Drag a workflow node's port here"}
+        </div>
+        {connected && (
+          <button
+            className="prop-btn"
+            style={{ marginTop: 4, fontSize: 11, padding: '4px 8px', width: '100%' }}
+            onClick={() => disconnectInput(id, WORKFLOW_HANDLE)}
+          >
+            ✂️ Disconnect
+          </button>
+        )}
+      </div>
+      <div className="prop-section">
+        <label className="prop-section-label">Number of Generations</label>
+        <input
+          type="number"
+          className="prop-input"
+          min={1}
+          max={100}
+          value={data.count ?? 1}
+          onChange={(e) => onChange(id, { count: parseInt(e.target.value, 10) || 1 })}
+        />
+      </div>
+      <div className="prop-section">
+        <label className="prop-section-label">Seed Mode</label>
+        <select className="prop-input" value={data.seedMode} onChange={(e) => onChange(id, { seedMode: e.target.value })}>
+          <option value="increment">Increment (seed, seed+1, …)</option>
+          <option value="random">Random each</option>
+          <option value="fixed">Fixed (same seed)</option>
+        </select>
+      </div>
+      <div className="prop-section">
+        <label className="prop-section-label">Base Seed</label>
+        <div className="range-row">
+          <input
+            type="number"
+            className="prop-input"
+            style={{ flex: 1 }}
+            value={data.baseSeed ?? 0}
+            onChange={(e) => onChange(id, { baseSeed: parseInt(e.target.value, 10) || 0 })}
+          />
+          <button
+            className="prop-btn"
+            style={{ flex: 0, padding: '6px 10px' }}
+            onClick={() => onChange(id, { baseSeed: Math.floor(Math.random() * 999999) })}
+          >
+            🎲
+          </button>
+        </div>
+      </div>
+      {status && (
+        <div className="prop-section">
+          <div className="prop-value" style={{ color: status.state === 'error' ? '#f44336' : '#888' }}>{status.text}</div>
+        </div>
+      )}
+      <div className="prop-section">
+        <button className="generate-btn" disabled={running} onClick={() => runGenerate(id)}>
+          {running ? '⏳ Running…' : '▶ Generate'}
+        </button>
+      </div>
+    </>
   );
 }
 
