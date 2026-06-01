@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiGet } from '../api';
 import type { TemplateParam } from '../types';
 
 interface TemplateSummary {
@@ -49,14 +50,13 @@ export function WorkflowPicker({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/templates')
-      .then((r) => r.json())
+    apiGet<TemplateSummary[]>('/api/templates')
       .then((data) => setTemplates(Array.isArray(data) ? data : []))
       .catch((e) => setError(e.message));
   }, []);
 
   async function choose(id: string) {
-    const t = (await (await fetch(`/api/templates/${id}`)).json()) as TemplateFull;
+    const t = await apiGet<TemplateFull>(`/api/templates/${id}`);
     onPick(workflowDataFromTemplate(t));
   }
 
