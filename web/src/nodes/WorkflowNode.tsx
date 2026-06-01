@@ -24,22 +24,27 @@ export function WorkflowNode({ data, selected }: NodeProps) {
       <div className="cv-node-type" style={{ color }}>{d.templateName || 'Workflow'}</div>
       {d.label ? <div className="cv-node-sublabel">{d.label}</div> : null}
 
+      {/* Input ports: Handles must be direct children of the node so their
+          offset parent is the node box and `top` aligns to the node edge. */}
       {inputs.map((input, i) => {
         const top = PORT_TOP_START + i * PORT_SPACING;
         const isPrompt = input.type === 'prompt';
         return (
-          <div key={input.name} className="cv-input-row" style={{ top }}>
-            <Handle
-              id={input.name}
-              type="target"
-              position={Position.Left}
-              style={{ top }}
-              className={`cv-handle ${isPrompt ? 'cv-handle-prompt' : 'cv-handle-image'}`}
-            />
-            <span className="cv-input-label">{input.label || input.name}</span>
-          </div>
+          <Handle
+            key={input.name}
+            id={input.name}
+            type="target"
+            position={Position.Left}
+            style={{ top }}
+            className={`cv-handle ${isPrompt ? 'cv-handle-prompt' : 'cv-handle-image'}`}
+          />
         );
       })}
+      {inputs.map((input, i) => (
+        <span key={`label-${input.name}`} className="cv-input-label" style={{ top: PORT_TOP_START + i * PORT_SPACING }}>
+          {input.label || input.name}
+        </span>
+      ))}
 
       <Handle
         id={OUTPUT_HANDLE}

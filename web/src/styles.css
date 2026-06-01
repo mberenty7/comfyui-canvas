@@ -67,16 +67,17 @@ body,
   margin-top: 2px;
 }
 .cv-input-row {
+  display: none;
+}
+.cv-input-label {
   position: absolute;
-  left: 10px;
+  left: 14px;
+  transform: translateY(-50%);
   font-size: 9px;
   color: #888;
   font-family: monospace;
   pointer-events: none;
-}
-.cv-input-label {
-  display: inline-block;
-  transform: translateY(-50%);
+  white-space: nowrap;
 }
 .cv-node-type {
   font-size: 10px;
