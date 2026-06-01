@@ -2,3 +2,4 @@ node_modules/
 uploads/
 canvases/
 /config.json
+public/dist/

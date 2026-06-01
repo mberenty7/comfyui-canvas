@@ -44,6 +44,8 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.static('public'));
 app.use('/uploads', express.static(UPLOAD_DIR));
 app.use('/models', express.static(MODELS_DIR));
+// React Flow preview app (built by `npm run build:web` into public/dist).
+app.use('/app', express.static(path.join(__dirname, 'public/dist')));
 
 const upload = multer({ dest: UPLOAD_DIR });
 

@@ -1,0 +1,119 @@
+:root {
+  --cv-bg: #1a1a2e;
+  --cv-panel: #16162a;
+  --cv-border: #333;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: var(--cv-bg);
+  font-family: Inter, system-ui, sans-serif;
+  color: #ddd;
+}
+
+.react-flow {
+  background: var(--cv-bg);
+}
+
+/* ── Nodes ───────────────────────────────────── */
+.cv-node {
+  width: 160px;
+  min-height: 50px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #1e1e3a;
+  border: 1.5px solid #444;
+  box-sizing: border-box;
+}
+.cv-node.selected {
+  border-color: #fff;
+}
+.cv-node-prompt {
+  border-color: #a855f7;
+}
+.cv-node-type {
+  font-size: 10px;
+  font-weight: 700;
+  color: #a855f7;
+}
+.cv-node-label {
+  font-size: 10px;
+  color: #aaa;
+  margin-top: 14px;
+  min-height: 12px;
+}
+.cv-handle {
+  width: 10px;
+  height: 10px;
+  border: 2px solid #fff;
+}
+.cv-handle-prompt {
+  background: #a855f7;
+}
+
+/* ── Toolbar ─────────────────────────────────── */
+.cv-toolbar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.cv-toolbar button {
+  background: #25253f;
+  color: #ddd;
+  border: 1px solid var(--cv-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cv-toolbar button:hover {
+  background: #30304f;
+}
+.cv-toolbar-note {
+  font-size: 11px;
+  color: #666;
+  margin-left: 6px;
+}
+
+/* ── Properties panel ────────────────────────── */
+.cv-properties {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 300px;
+  height: 100vh;
+  background: var(--cv-panel);
+  border-left: 1px solid var(--cv-border);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+}
+.cv-properties-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--cv-border);
+}
+.cv-properties-header h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.cv-properties-header button {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 16px;
+}
+.cv-properties-body {
+  padding: 14px;
+  overflow-y: auto;
+}
