@@ -1,5 +1,6 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { PromptNodeData } from '../types';
+import { OUTPUT_HANDLE } from '../ports';
 
 /**
  * Prompt node — mirrors the legacy fabric PromptNode visual:
@@ -13,7 +14,7 @@ export function PromptNode({ data, selected }: NodeProps) {
     <div className={`cv-node cv-node-prompt${selected ? ' selected' : ''}`}>
       <div className="cv-node-type">Prompt</div>
       <div className="cv-node-label">{d.label || ''}</div>
-      <Handle type="source" position={Position.Right} className="cv-handle cv-handle-prompt" />
+      <Handle id={OUTPUT_HANDLE} type="source" position={Position.Right} className="cv-handle cv-handle-prompt" />
     </div>
   );
 }

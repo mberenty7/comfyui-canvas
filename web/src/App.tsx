@@ -13,6 +13,7 @@ import { useCanvasStore } from './store';
 import { nodeTypes } from './nodes';
 import { Toolbar } from './panels/Toolbar';
 import { PropertiesPanel } from './panels/PropertiesPanel';
+import { isValidConnection as checkConnection } from './ports';
 import type { CanvasFileV2 } from './types';
 
 const AUTOSAVE_KEY = 'comfyui-canvas-autosave';
@@ -78,6 +79,12 @@ function Canvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        isValidConnection={(c) =>
+          checkConnection(
+            { source: c.source, target: c.target, sourceHandle: c.sourceHandle, targetHandle: c.targetHandle },
+            (id) => useCanvasStore.getState().nodes.find((n) => n.id === id),
+          )
+        }
         onSelectionChange={onSelectionChange}
         onMoveEnd={onMoveEnd}
         proOptions={{ hideAttribution: true }}

@@ -14,6 +14,60 @@ export interface PromptNodeData {
   [key: string]: unknown;
 }
 
+export interface ImageNodeData {
+  label: string;
+  imageUrl: string;
+  filename: string;
+  comfyName: string;
+  width?: number;
+  height?: number;
+  fileSize?: number;
+  format?: string;
+  maskComfyName?: string | null;
+  [key: string]: unknown;
+}
+
+/** A typed input slot declared by a workflow template's config.json. */
+export interface TemplateInput {
+  name: string;
+  type: 'prompt' | 'image';
+  label?: string;
+  optional?: boolean;
+  [key: string]: unknown;
+}
+
+/** A tunable parameter declared by a workflow template's config.json. */
+export interface TemplateParam {
+  name: string;
+  label?: string;
+  type: 'slider' | 'range' | 'select' | 'seed' | 'integer' | 'number' | 'text' | 'hidden';
+  default?: unknown;
+  options?: string[];
+  min?: number;
+  max?: number;
+  step?: number;
+  [key: string]: unknown;
+}
+
+export interface WorkflowNodeData {
+  label: string;
+  templateId: string;
+  templateName: string;
+  templateColor: string;
+  cost?: { credits: number; note?: string } | null;
+  inputs: TemplateInput[];
+  params: TemplateParam[];
+  workflow?: Record<string, unknown>;
+  paramValues: Record<string, unknown>;
+  connectedInputs?: Record<string, { nodeId: string }>;
+  backend?: string;
+  bflEndpoint?: string;
+  [key: string]: unknown;
+}
+
+/** Output port "type" a node emits, used for connection validation. */
+export type PortType = 'image' | 'prompt';
+
 export type GenericNodeData = Record<string, unknown>;
 
 export type CanvasNode = Node;

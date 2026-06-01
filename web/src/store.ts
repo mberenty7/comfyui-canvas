@@ -34,6 +34,7 @@ interface CanvasState {
   addNode: (type: string, data: Record<string, unknown>, position: { x: number; y: number }) => string;
   updateNodeData: (id: string, patch: Record<string, unknown>) => void;
   deleteNode: (id: string) => void;
+  disconnectInput: (targetId: string, handle: string) => void;
 
   // Persistence (legacy v2 compatible)
   serialize: () => CanvasFileV2;
@@ -57,7 +58,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   onConnect: (connection) => {
-    set({ edges: addEdge(connection, get().edges) });
+    // One source per target input handle: a new wire replaces an existing one.
+    const edges = get().edges.filter(
+      (e) => !(e.target === connection.target && e.targetHandle === connection.targetHandle),
+    );
+    set({ edges: addEdge(connection, edges) });
   },
 
   setSelected: (id) => set({ selectedId: id }),
@@ -90,6 +95,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       nodes: get().nodes.filter((n) => n.id !== id),
       edges: get().edges.filter((e) => e.source !== id && e.target !== id),
       selectedId: get().selectedId === id ? null : get().selectedId,
+    });
+  },
+
+  disconnectInput: (targetId, handle) => {
+    set({
+      edges: get().edges.filter((e) => !(e.target === targetId && e.targetHandle === handle)),
     });
   },
 

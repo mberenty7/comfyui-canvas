@@ -34,6 +34,50 @@ body,
 .cv-node-prompt {
   border-color: #a855f7;
 }
+.cv-node-image {
+  border-color: #4a9eff;
+  width: 180px;
+}
+.cv-node-workflow {
+  border-color: #4a9eff;
+  width: 180px;
+  position: relative;
+}
+.cv-node-thumb {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+.cv-node-thumb-empty {
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  font-size: 11px;
+  background: #15152b;
+}
+.cv-node-sublabel {
+  font-size: 9px;
+  color: #888;
+  font-family: monospace;
+  margin-top: 2px;
+}
+.cv-input-row {
+  position: absolute;
+  left: 10px;
+  font-size: 9px;
+  color: #888;
+  font-family: monospace;
+  pointer-events: none;
+}
+.cv-input-label {
+  display: inline-block;
+  transform: translateY(-50%);
+}
 .cv-node-type {
   font-size: 10px;
   font-weight: 700;
@@ -52,6 +96,65 @@ body,
 }
 .cv-handle-prompt {
   background: #a855f7;
+}
+.cv-handle-image {
+  background: #4a9eff;
+}
+
+/* ── Workflow picker modal ───────────────────── */
+.cv-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.cv-modal {
+  background: var(--cv-panel);
+  border: 1px solid var(--cv-border);
+  border-radius: 10px;
+  padding: 20px;
+  width: 420px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.cv-modal h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+.cv-modal-note,
+.cv-modal-error {
+  font-size: 12px;
+  color: #888;
+  padding: 8px 0;
+}
+.cv-modal-error {
+  color: #ff6b6b;
+}
+.cv-template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cv-template-card {
+  border: 1px solid var(--cv-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.cv-template-card:hover {
+  background: #20203a;
+}
+.cv-template-card h4 {
+  margin: 0 0 4px;
+  font-size: 13px;
+}
+.cv-template-card p {
+  margin: 0;
+  font-size: 12px;
+  color: #888;
 }
 
 /* ── Toolbar ─────────────────────────────────── */
