@@ -1,5 +1,46 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCanvasStore } from '../store';
 import type { PromptNodeData } from '../types';
+
+const WIDTH_KEY = 'cv-properties-width';
+const MIN_WIDTH = 240;
+const MAX_WIDTH = 640;
+
+/** Drag handle on the panel's left edge that resizes its width (persisted). */
+function useResizableWidth() {
+  const [width, setWidth] = useState(() => {
+    const saved = Number(localStorage.getItem(WIDTH_KEY));
+    return saved >= MIN_WIDTH && saved <= MAX_WIDTH ? saved : 300;
+  });
+  const dragging = useRef(false);
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    dragging.current = true;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }, []);
+
+  useEffect(() => {
+    function onMove(e: PointerEvent) {
+      if (!dragging.current) return;
+      const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, window.innerWidth - e.clientX));
+      setWidth(next);
+    }
+    function onUp() {
+      if (!dragging.current) return;
+      dragging.current = false;
+      localStorage.setItem(WIDTH_KEY, String(width));
+    }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [width]);
+
+  return { width, onPointerDown };
+}
 
 /**
  * Side panel — the React replacement for the legacy `renderProperties()` /
@@ -11,11 +52,13 @@ export function PropertiesPanel() {
   const selectedId = useCanvasStore((s) => s.selectedId);
   const node = useCanvasStore((s) => s.nodes.find((n) => n.id === selectedId));
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const { width, onPointerDown } = useResizableWidth();
 
   if (!node) return null;
 
   return (
-    <div className="cv-properties">
+    <div className="cv-properties" style={{ width }}>
+      <div className="cv-properties-resizer" onPointerDown={onPointerDown} />
       <div className="cv-properties-header">
         <h3>Properties</h3>
         <button onClick={() => useCanvasStore.getState().setSelected(null)}>✕</button>

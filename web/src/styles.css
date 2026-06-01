@@ -95,6 +95,19 @@ body,
   display: flex;
   flex-direction: column;
 }
+.cv-properties-resizer {
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 11;
+}
+.cv-properties-resizer:hover {
+  background: #a855f7;
+  opacity: 0.4;
+}
 .cv-properties-header {
   display: flex;
   justify-content: space-between;
