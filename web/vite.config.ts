@@ -18,6 +18,7 @@ export default defineConfig({
       '/api': 'http://localhost:3002',
       '/uploads': 'http://localhost:3002',
       '/models': 'http://localhost:3002',
+      '/shaders': 'http://localhost:3002',
       '/style.css': 'http://localhost:3002',
     },
   },

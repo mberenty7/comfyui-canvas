@@ -22,6 +22,7 @@ import { ContextMenu } from './panels/ContextMenu';
 import { WorkflowPicker } from './panels/WorkflowPicker';
 import { SettingsModal } from './panels/SettingsModal';
 import { MaskEditor } from './panels/MaskEditor';
+import { Viewer3DModal } from './panels/Viewer3DModal';
 import { useViewer3D } from './viewer3d';
 import { isValidConnection as checkConnection, MODEL_HANDLE } from './ports';
 import type { ModelNodeData } from './types';
@@ -200,6 +201,7 @@ function Canvas() {
       )}
       {settingsOpen && <SettingsModal onClose={() => useUI.getState().setSettingsOpen(false)} />}
       <MaskEditor />
+      <Viewer3DModal />
     </div>
   );
 }
