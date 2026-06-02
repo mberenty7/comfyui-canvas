@@ -27,7 +27,8 @@ module.exports = function createComfyRouter({ configRef, upload, UPLOAD_DIR }) {
         originalName: file.originalname,
       });
     } catch (e) {
-      return err(res, 'COMFY_ROUTE_ERROR', e.message, 500);
+      console.error('Comfy route error:', e);
+      return err(res, 'COMFY_ROUTE_ERROR', e.message || e.code || String(e), 500);
     }
   });
 
@@ -41,7 +42,8 @@ module.exports = function createComfyRouter({ configRef, upload, UPLOAD_DIR }) {
       const result = await proxyRequest(config.comfyUrl, 'POST', '/prompt', payload);
       return ok(res, result.data);
     } catch (e) {
-      return err(res, 'COMFY_ROUTE_ERROR', e.message, 500);
+      console.error('Comfy route error:', e);
+      return err(res, 'COMFY_ROUTE_ERROR', e.message || e.code || String(e), 500);
     }
   });
 
@@ -51,7 +53,8 @@ module.exports = function createComfyRouter({ configRef, upload, UPLOAD_DIR }) {
       const result = await proxyRequest(config.comfyUrl, 'GET', `/history/${req.params.promptId}`);
       return ok(res, result.data);
     } catch (e) {
-      return err(res, 'COMFY_ROUTE_ERROR', e.message, 500);
+      console.error('Comfy route error:', e);
+      return err(res, 'COMFY_ROUTE_ERROR', e.message || e.code || String(e), 500);
     }
   });
 
@@ -75,7 +78,8 @@ module.exports = function createComfyRouter({ configRef, upload, UPLOAD_DIR }) {
         });
       }).on('error', e => err(res, 'COMFY_VIEW_ERROR', e.message, 500));
     } catch (e) {
-      return err(res, 'COMFY_ROUTE_ERROR', e.message, 500);
+      console.error('Comfy route error:', e);
+      return err(res, 'COMFY_ROUTE_ERROR', e.message || e.code || String(e), 500);
     }
   });
 
@@ -85,7 +89,7 @@ module.exports = function createComfyRouter({ configRef, upload, UPLOAD_DIR }) {
       const result = await proxyRequest(config.comfyUrl, 'GET', '/system_stats');
       return ok(res, { connected: true, ...result.data });
     } catch (e) {
-      return err(res, 'COMFY_DISCONNECTED', e.message, 200);
+      return err(res, 'COMFY_DISCONNECTED', e.message || e.code || String(e), 200);
     }
   });
 
