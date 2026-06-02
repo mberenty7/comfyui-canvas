@@ -159,7 +159,14 @@ function Canvas() {
       >
         <Background color="#2a2a44" gap={20} />
         <Controls />
-        <MiniMap pannable zoomable />
+        <MiniMap
+          pannable
+          zoomable
+          bgColor="#16162a"
+          maskColor="rgba(10, 10, 22, 0.6)"
+          nodeColor="#4a9eff"
+          nodeStrokeColor="#2a2a44"
+        />
       </ReactFlow>
       <PropertiesPanel />
       <LogPanel />

@@ -17,6 +17,19 @@ body,
 .react-flow {
   background: var(--cv-bg);
 }
+.react-flow__minimap {
+  border: 1px solid var(--cv-border);
+  border-radius: 6px;
+}
+.react-flow__controls-button {
+  background: #25253f;
+  border-bottom: 1px solid var(--cv-border);
+  color: #ddd;
+  fill: #ddd;
+}
+.react-flow__controls-button:hover {
+  background: #30304f;
+}
 
 /* ── Nodes ───────────────────────────────────── */
 .cv-node {
