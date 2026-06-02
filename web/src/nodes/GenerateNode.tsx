@@ -23,7 +23,7 @@ export function GenerateNode({ id, data, selected }: NodeProps) {
   return (
     <div
       className={`cv-node cv-node-generate${selected ? ' selected' : ''}`}
-      style={{ borderColor: color, borderStyle: state === 'running' ? 'dashed' : 'solid' }}
+      style={{ borderColor: selected ? '#fff' : color, borderStyle: state === 'running' ? 'dashed' : 'solid' }}
     >
       <div className="cv-node-type" style={{ color: '#4caf50' }}>Generate</div>
       <div className="cv-node-status">{status?.text || 'Ready'}</div>

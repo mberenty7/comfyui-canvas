@@ -19,7 +19,7 @@ export function WorkflowNode({ data, selected }: NodeProps) {
   return (
     <div
       className={`cv-node cv-node-workflow${selected ? ' selected' : ''}`}
-      style={{ borderColor: color, minHeight: height }}
+      style={{ borderColor: selected ? '#fff' : color, minHeight: height }}
     >
       <div className="cv-node-type" style={{ color }}>{d.templateName || 'Workflow'}</div>
       {d.label ? <div className="cv-node-sublabel">{d.label}</div> : null}

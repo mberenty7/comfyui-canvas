@@ -77,6 +77,7 @@ function Canvas() {
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        deleteKeyCode={['Backspace', 'Delete']}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
