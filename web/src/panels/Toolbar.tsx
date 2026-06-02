@@ -3,6 +3,8 @@ import { useReactFlow } from '@xyflow/react';
 import { useCanvasStore } from '../store';
 import { useLogStore } from '../logStore';
 import { WorkflowPicker } from './WorkflowPicker';
+import { SettingsModal } from './SettingsModal';
+import { StatusDot } from './StatusDot';
 import type { CanvasFileV2 } from '../types';
 
 /**
@@ -13,6 +15,7 @@ export function Toolbar() {
   const rf = useReactFlow();
   const addNode = useCanvasStore((s) => s.addNode);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   function center() {
     return rf.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
@@ -112,6 +115,8 @@ export function Toolbar() {
         <button onClick={saveCanvas}>💾 Save</button>
         <button onClick={loadCanvas}>📂 Load</button>
         <button onClick={() => useLogStore.getState().toggle()}>📋 Log</button>
+        <button onClick={() => setSettingsOpen(true)}>⚙️ Settings</button>
+        <StatusDot onClick={() => setSettingsOpen(true)} />
         <span className="cv-toolbar-note">React Flow preview</span>
       </div>
       {pickerOpen && (
@@ -124,6 +129,7 @@ export function Toolbar() {
           }}
         />
       )}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </>
   );
 }

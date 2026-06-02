@@ -261,6 +261,18 @@ body,
   color: #666;
   margin-left: 6px;
 }
+.cv-status-dot {
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  margin-left: 2px;
+}
+.cv-status-dot.connected {
+  color: #4caf50;
+}
+.cv-status-dot.disconnected {
+  color: #f44336;
+}
 
 /* ── Properties panel ────────────────────────── */
 .cv-properties {
