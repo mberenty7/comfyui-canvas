@@ -1,7 +1,7 @@
 import type { Node, Edge } from '@xyflow/react';
 import { useCanvasStore } from './store';
 import { buildWorkflow, type WorkflowGraph } from './nodes/buildWorkflow';
-import { apiGet, apiPost, apiUpload } from './api';
+import { apiGet, apiPost, apiUpload, unwrap } from './api';
 import { WORKFLOW_HANDLE } from './ports';
 import { addLog, useLogStore } from './logStore';
 import type { GenerateNodeData, WorkflowNodeData } from './types';
@@ -152,10 +152,22 @@ export async function runGenerate(genId: string): Promise<void> {
           if (wf[key].class_type === 'SaveImage') wf[key].inputs.filename_prefix = d.outputName;
         }
 
-        const resp = await apiPost<{ prompt_id?: string; node_errors?: Record<string, { errors?: { message: string }[] }> }>(
-          '/api/comfy/prompt',
-          { workflow: wf },
-        );
+        // Use a raw fetch so we can log the full response body before unwrapping.
+        const rawResp = await fetch('/api/comfy/prompt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ workflow: wf }),
+        });
+        const rawJson = await rawResp.json();
+        log(`Prompt response: ${JSON.stringify(rawJson).substring(0, 600)}`, 'info');
+        const resp = unwrap<{
+          prompt_id?: string;
+          error?: unknown;
+          node_errors?: Record<string, { errors?: { message: string }[] }>;
+        }>(rawJson);
+        if (resp.error) {
+          throw new Error(typeof resp.error === 'string' ? resp.error : JSON.stringify(resp.error));
+        }
         if (resp.node_errors && Object.keys(resp.node_errors).length > 0) {
           const errs = Object.values(resp.node_errors)
             .map((e) => e.errors?.map((x) => x.message).join(', ') || 'Unknown node error')

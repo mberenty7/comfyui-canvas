@@ -6,8 +6,12 @@
  */
 export function unwrap<T = unknown>(json: unknown): T {
   if (json && typeof json === 'object' && 'ok' in json) {
-    const env = json as { ok: boolean; data?: T; error?: { message?: string } };
-    if (!env.ok) throw new Error(env.error?.message || 'Request failed');
+    const env = json as { ok: boolean; data?: T; error?: { code?: string; message?: string; details?: unknown } };
+    if (!env.ok) {
+      const e = env.error;
+      const msg = [e?.message, e?.code].filter(Boolean).join(' ');
+      throw new Error(msg || (e ? JSON.stringify(e) : 'Request failed'));
+    }
     return env.data as T;
   }
   return json as T;
