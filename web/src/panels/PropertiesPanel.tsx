@@ -1,8 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCanvasStore } from '../store';
 import { runGenerate } from '../generate';
-import { WORKFLOW_HANDLE } from '../ports';
-import type { GenerateNodeData, ImageNodeData, PromptNodeData, TemplateParam, WorkflowNodeData } from '../types';
+import { WORKFLOW_HANDLE, MODEL_HANDLE, IMAGE_HANDLE } from '../ports';
+import { useViewer3D } from '../viewer3d';
+import { useMaskEditor } from '../maskEditor';
+import { apiUpload } from '../api';
+import { addLog } from '../logStore';
+import type {
+  GenerateNodeData,
+  ImageNodeData,
+  InpaintNodeData,
+  ModelNodeData,
+  PromptNodeData,
+  TemplateParam,
+  ViewerNodeData,
+  WorkflowNodeData,
+} from '../types';
 
 const WIDTH_KEY = 'cv-properties-width';
 const MIN_WIDTH = 240;
@@ -72,7 +85,10 @@ export function PropertiesPanel() {
         {node.type === 'image' && <ImageProperties id={node.id} data={node.data as ImageNodeData} onChange={updateNodeData} />}
         {node.type === 'workflow' && <WorkflowProperties id={node.id} data={node.data as WorkflowNodeData} onChange={updateNodeData} />}
         {node.type === 'generate' && <GenerateProperties id={node.id} data={node.data as GenerateNodeData} onChange={updateNodeData} />}
-        {!['prompt', 'image', 'workflow', 'generate'].includes(node.type ?? '') && (
+        {node.type === 'model' && <ModelProperties id={node.id} data={node.data as ModelNodeData} onChange={updateNodeData} />}
+        {node.type === 'viewer' && <ViewerProperties id={node.id} data={node.data as ViewerNodeData} onChange={updateNodeData} />}
+        {node.type === 'inpaint' && <InpaintProperties id={node.id} data={node.data as InpaintNodeData} onChange={updateNodeData} />}
+        {!['prompt', 'image', 'workflow', 'generate', 'model', 'viewer', 'inpaint'].includes(node.type ?? '') && (
           <div className="prop-section">
             <label className="prop-section-label">Type</label>
             <div className="prop-value">{node.type}</div>
@@ -451,6 +467,172 @@ function GenerateProperties({
         <button className="generate-btn" disabled={running} onClick={() => runGenerate(id)}>
           {running ? '⏳ Running…' : '▶ Generate'}
         </button>
+      </div>
+    </>
+  );
+}
+
+function ModelProperties({
+  id,
+  data,
+  onChange,
+}: {
+  id: string;
+  data: ModelNodeData;
+  onChange: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  const sizeStr = data.fileSize
+    ? data.fileSize > 1024 * 1024
+      ? `${(data.fileSize / 1024 / 1024).toFixed(1)} MB`
+      : `${(data.fileSize / 1024).toFixed(1)} KB`
+    : '—';
+  return (
+    <>
+      <div className="prop-section">
+        <label className="prop-section-label">Label</label>
+        <input type="text" className="prop-input" value={data.label ?? ''} placeholder="e.g. Character Model" onChange={(e) => onChange(id, { label: e.target.value })} />
+      </div>
+      <PropRow label="Filename" value={data.filename || '—'} />
+      <PropRow label="Format" value={data.format || '—'} />
+      <PropRow label="Size" value={sizeStr} />
+      <div className="prop-section">
+        <button
+          className="generate-btn"
+          style={{ background: '#e94560' }}
+          disabled={!data.modelUrl}
+          onClick={() => useViewer3D.getState().openViewer(data.modelUrl, data.filename)}
+        >
+          👁 Open 3D Viewer
+        </button>
+      </div>
+    </>
+  );
+}
+
+function ViewerProperties({
+  id,
+  data,
+  onChange,
+}: {
+  id: string;
+  data: ViewerNodeData;
+  onChange: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  const edges = useCanvasStore((s) => s.edges);
+  const nodes = useCanvasStore((s) => s.nodes);
+  const disconnectInput = useCanvasStore((s) => s.disconnectInput);
+  const modelEdge = edges.find((e) => e.target === id && e.targetHandle === MODEL_HANDLE);
+  const modelNode = modelEdge ? nodes.find((n) => n.id === modelEdge.source) : undefined;
+  const modelData = modelNode?.data as ModelNodeData | undefined;
+
+  return (
+    <>
+      <div className="prop-section">
+        <label className="prop-section-label">Label</label>
+        <input type="text" className="prop-input" value={data.label ?? ''} placeholder="e.g. Character Viewer" onChange={(e) => onChange(id, { label: e.target.value })} />
+      </div>
+      <div className="prop-section">
+        <label className="prop-section-label">🎲 Model Input</label>
+        <div className="workflow-input-slot" style={{ color: modelEdge ? '#4caf50' : '#888' }}>
+          {modelEdge ? '✅ Connected' : "Drag a 3D Model node's port here"}
+        </div>
+        {modelEdge && (
+          <button className="prop-btn" style={{ marginTop: 4, fontSize: 11, padding: '4px 8px', width: '100%' }} onClick={() => disconnectInput(id, MODEL_HANDLE)}>
+            ✂️ Disconnect
+          </button>
+        )}
+      </div>
+      <div className="prop-section">
+        <button
+          className="generate-btn"
+          style={{ background: '#e94560' }}
+          disabled={!modelData?.modelUrl}
+          onClick={() => modelData && useViewer3D.getState().openViewer(modelData.modelUrl, modelData.filename)}
+        >
+          👁 Open Viewer
+        </button>
+      </div>
+    </>
+  );
+}
+
+function InpaintProperties({
+  id,
+  data,
+  onChange,
+}: {
+  id: string;
+  data: InpaintNodeData;
+  onChange: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  const edges = useCanvasStore((s) => s.edges);
+  const nodes = useCanvasStore((s) => s.nodes);
+  const disconnectInput = useCanvasStore((s) => s.disconnectInput);
+  const imgEdge = edges.find((e) => e.target === id && e.targetHandle === IMAGE_HANDLE);
+  const imgNode = imgEdge ? nodes.find((n) => n.id === imgEdge.source) : undefined;
+  const imgData = imgNode?.data as ImageNodeData | undefined;
+
+  function paintMask() {
+    if (!imgData?.imageUrl) return;
+    useMaskEditor.getState().open({
+      imageUrl: imgData.imageUrl,
+      width: imgData.width || 1024,
+      height: imgData.height || 1024,
+      existingMask: data.maskDataUrl ?? null,
+      onSave: async (maskDataUrl) => {
+        onChange(id, { maskDataUrl });
+        try {
+          const blob = await (await fetch(maskDataUrl)).blob();
+          const form = new FormData();
+          form.append('image', new File([blob], `mask_inpaint_${id}.png`, { type: 'image/png' }));
+          const result = await apiUpload<{ comfyName?: string }>('/api/comfy/upload', form);
+          if (result.comfyName) onChange(id, { maskComfyName: result.comfyName });
+          addLog('Inpaint mask saved', 'success');
+        } catch (e) {
+          addLog(`Failed to upload mask: ${(e as Error).message}`, 'warn');
+        }
+      },
+    });
+  }
+
+  return (
+    <>
+      <div className="prop-section">
+        <label className="prop-section-label">Label</label>
+        <input type="text" className="prop-input" value={data.label ?? ''} placeholder="e.g. Fix face" onChange={(e) => onChange(id, { label: e.target.value })} />
+      </div>
+      <div className="prop-section">
+        <label className="prop-section-label">📷 Source Image</label>
+        <div className="workflow-input-slot" style={{ color: imgEdge ? '#4caf50' : '#888' }}>
+          {imgEdge ? '✅ Connected' : "Drag an image node's port here"}
+        </div>
+        {imgEdge && (
+          <button className="prop-btn" style={{ marginTop: 4, fontSize: 11, padding: '4px 8px', width: '100%' }} onClick={() => disconnectInput(id, IMAGE_HANDLE)}>
+            ✂️ Disconnect
+          </button>
+        )}
+      </div>
+      <div className="prop-section">
+        <label className="prop-section-label">🎨 Mask</label>
+        <button className="generate-btn" disabled={!imgEdge} onClick={paintMask}>
+          {data.maskDataUrl ? '🎨 Edit Mask' : '🎨 Paint Mask'}
+        </button>
+        {data.maskDataUrl ? (
+          <>
+            <div style={{ marginTop: 6, textAlign: 'center' }}>
+              <img src={data.maskDataUrl} style={{ maxWidth: '100%', maxHeight: 100, border: '1px solid #333', borderRadius: 4 }} alt="mask" />
+            </div>
+            <button
+              className="prop-btn"
+              style={{ marginTop: 4, fontSize: 11, padding: '4px 8px', width: '100%' }}
+              onClick={() => onChange(id, { maskDataUrl: null, maskComfyName: null })}
+            >
+              🗑 Clear Mask
+            </button>
+          </>
+        ) : (
+          <p style={{ fontSize: 11, color: '#666', marginTop: 4 }}>Paint white over areas to inpaint. Black = keep.</p>
+        )}
       </div>
     </>
   );

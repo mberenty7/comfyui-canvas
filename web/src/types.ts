@@ -81,8 +81,32 @@ export interface GenStatus {
   text: string;
 }
 
+export interface ModelNodeData {
+  label: string;
+  modelUrl: string;
+  filename: string;
+  comfyName?: string;
+  format?: string;
+  fileSize?: number;
+  [key: string]: unknown;
+}
+
+export interface ViewerNodeData {
+  label: string;
+  connectedModel?: { nodeId: string } | null;
+  [key: string]: unknown;
+}
+
+export interface InpaintNodeData {
+  label: string;
+  maskDataUrl?: string | null;
+  maskComfyName?: string | null;
+  connectedImage?: { nodeId: string } | null;
+  [key: string]: unknown;
+}
+
 /** Output port "type" a node emits, used for connection validation. */
-export type PortType = 'image' | 'prompt' | 'workflow';
+export type PortType = 'image' | 'prompt' | 'workflow' | 'model';
 
 export type GenericNodeData = Record<string, unknown>;
 

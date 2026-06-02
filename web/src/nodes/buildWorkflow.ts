@@ -5,6 +5,26 @@ import { apiGet } from '../api';
 /** A ComfyUI prompt graph: node id → { class_type, inputs }. */
 export type WorkflowGraph = Record<string, { class_type: string; inputs: Record<string, unknown> }>;
 
+/** Insert LoadImage → ImageToMask → optional FeatherMask, feeding VAEEncodeForInpaint. */
+function wireMask(wf: WorkflowGraph, targetNodeId: string, maskComfyName: string, feather: number) {
+  const maskLoadId = targetNodeId + '_mask_load';
+  const maskConvertId = targetNodeId + '_mask_convert';
+  wf[maskLoadId] = { class_type: 'LoadImage', inputs: { image: maskComfyName } };
+  wf[maskConvertId] = { class_type: 'ImageToMask', inputs: { image: [maskLoadId, 0], channel: 'red' } };
+  let finalMaskRef: [string, number] = [maskConvertId, 0];
+  if (feather > 0) {
+    const featherId = targetNodeId + '_mask_feather';
+    wf[featherId] = {
+      class_type: 'FeatherMask',
+      inputs: { mask: [maskConvertId, 0], left: feather, top: feather, right: feather, bottom: feather },
+    };
+    finalMaskRef = [featherId, 0];
+  }
+  for (const key of Object.keys(wf)) {
+    if (wf[key].class_type === 'VAEEncodeForInpaint') wf[key].inputs.mask = finalMaskRef;
+  }
+}
+
 interface TemplateRefresh {
   workflow?: WorkflowGraph;
   inputs?: TemplateInput[];
@@ -17,10 +37,14 @@ interface TemplateRefresh {
  * node data instead of fabric objects. `connectedInputs` is derived from the
  * current edges by the caller.
  */
+/** Resolves an Inpaint node's source image + mask names (from edges/data). */
+export type InpaintResolver = (inpaintNodeId: string) => { comfyName?: string; maskComfyName?: string | null } | null;
+
 export async function buildWorkflow(
   wfData: WorkflowNodeData,
   connectedInputs: Record<string, { nodeId: string }>,
   getNode: (id: string) => Node | undefined,
+  getInpaintData?: InpaintResolver,
 ): Promise<WorkflowGraph> {
   let workflow = wfData.workflow as WorkflowGraph | undefined;
   let templateInputs = wfData.inputs ?? [];
@@ -72,9 +96,21 @@ export async function buildWorkflow(
     const srcData = (source.data ?? {}) as Record<string, unknown>;
 
     if (source.type === 'inpaint') {
-      // Inpaint node not yet ported to the React app — skip its image/mask
-      // wiring rather than crash. (Handled when InpaintNode is migrated.)
-      console.warn('buildWorkflow: inpaint source not yet supported in React preview');
+      // Inpaint provides image + mask to the workflow's image input.
+      const inpaint = getInpaintData?.(source.id);
+      const targetNodeId = input.target_node as string | undefined;
+      if (input.type === 'image' && inpaint?.comfyName && targetNodeId) {
+        const node = wf[targetNodeId];
+        if (node) node.inputs[(input.target_field as string) || 'image'] = inpaint.comfyName;
+        if (input.uses_mask && inpaint.maskComfyName) {
+          wireMask(wf, targetNodeId, inpaint.maskComfyName, feather);
+        }
+        if (input.link_output) {
+          const lo = input.link_output as { to_node: string; to_field: string; from_node: string; from_output: number };
+          const targetNode = wf[lo.to_node];
+          if (targetNode) targetNode.inputs[lo.to_field] = [lo.from_node, lo.from_output];
+        }
+      }
       continue;
     }
 
@@ -97,22 +133,7 @@ export async function buildWorkflow(
       }
       // Mask wiring (LoadImage → ImageToMask → optional FeatherMask).
       if (input.uses_mask && srcData.maskComfyName && targetNodeId) {
-        const maskLoadId = targetNodeId + '_mask_load';
-        const maskConvertId = targetNodeId + '_mask_convert';
-        wf[maskLoadId] = { class_type: 'LoadImage', inputs: { image: srcData.maskComfyName } };
-        wf[maskConvertId] = { class_type: 'ImageToMask', inputs: { image: [maskLoadId, 0], channel: 'red' } };
-        let finalMaskRef: [string, number] = [maskConvertId, 0];
-        if (feather > 0) {
-          const featherId = targetNodeId + '_mask_feather';
-          wf[featherId] = {
-            class_type: 'FeatherMask',
-            inputs: { mask: [maskConvertId, 0], left: feather, top: feather, right: feather, bottom: feather },
-          };
-          finalMaskRef = [featherId, 0];
-        }
-        for (const key of Object.keys(wf)) {
-          if (wf[key].class_type === 'VAEEncodeForInpaint') wf[key].inputs.mask = finalMaskRef;
-        }
+        wireMask(wf, targetNodeId, srcData.maskComfyName as string, feather);
       }
       if (input.link_output) {
         const lo = input.link_output as { to_node: string; to_field: string; from_node: string; from_output: number };

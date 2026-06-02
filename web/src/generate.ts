@@ -1,8 +1,8 @@
 import type { Node, Edge } from '@xyflow/react';
 import { useCanvasStore } from './store';
-import { buildWorkflow, type WorkflowGraph } from './nodes/buildWorkflow';
+import { buildWorkflow, type WorkflowGraph, type InpaintResolver } from './nodes/buildWorkflow';
 import { apiGet, apiPost, apiUpload, unwrap } from './api';
-import { WORKFLOW_HANDLE } from './ports';
+import { WORKFLOW_HANDLE, IMAGE_HANDLE } from './ports';
 import { addLog, addVerbose, useLogStore } from './logStore';
 import type { GenerateNodeData, WorkflowNodeData } from './types';
 
@@ -34,6 +34,18 @@ function connectedInputsFor(workflowId: string, edges: Edge[]): Record<string, {
   }
   return map;
 }
+
+/** Resolve an Inpaint node's connected image comfyName + its mask name. */
+const resolveInpaint: InpaintResolver = (inpaintId) => {
+  const { nodes, edges } = useCanvasStore.getState();
+  const inpaint = nodes.find((n) => n.id === inpaintId);
+  const imgEdge = edges.find((e) => e.target === inpaintId && e.targetHandle === IMAGE_HANDLE);
+  const imgNode = imgEdge ? nodes.find((n) => n.id === imgEdge.source) : undefined;
+  return {
+    comfyName: (imgNode?.data as { comfyName?: string } | undefined)?.comfyName,
+    maskComfyName: (inpaint?.data as { maskComfyName?: string | null } | undefined)?.maskComfyName ?? null,
+  };
+};
 
 function getSeeds(d: GenerateNodeData): number[] {
   const seeds: number[] = [];
@@ -148,7 +160,7 @@ export async function runGenerate(genId: string): Promise<void> {
           continue;
         }
 
-        const wf = await buildWorkflow({ ...wfData, paramValues }, connectedInputs, getNode);
+        const wf = await buildWorkflow({ ...wfData, paramValues }, connectedInputs, getNode, resolveInpaint);
         for (const key of Object.keys(wf)) {
           if (wf[key].class_type === 'SaveImage') wf[key].inputs.filename_prefix = d.outputName;
         }

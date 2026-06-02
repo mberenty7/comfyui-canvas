@@ -9,29 +9,33 @@ interface ConnectionLike {
   targetHandle?: string | null;
 }
 
-/** Stable id for a node's single output handle. */
 export const OUTPUT_HANDLE = 'out';
 /** The single workflow-input handle on a Generate node. */
 export const WORKFLOW_HANDLE = 'workflow';
+/** The model-input handle on a Viewer node. */
+export const MODEL_HANDLE = 'model';
+/** The image-input handle on an Inpaint node. */
+export const IMAGE_HANDLE = 'image';
 
 /**
- * The port type a node emits from its output handle. Mirrors the legacy
- * connection rules in app.js `handleConnect`: prompt nodes emit 'prompt',
- * image-producing nodes emit 'image', and a workflow node emits 'workflow'
- * (it only feeds a Generate node).
+ * The port types a node's output can satisfy. A model is polymorphic: it feeds
+ * both a Viewer's model input and a Workflow's image input (camera captures).
+ * Mirrors the legacy connection rules in app.js `handleConnect`.
  */
-export function outputType(node: Node): PortType | null {
+export function sourceProvides(node: Node): PortType[] {
   switch (node.type) {
     case 'prompt':
-      return 'prompt';
-    case 'workflow':
-      return 'workflow';
+      return ['prompt'];
     case 'image':
+      return ['image'];
+    case 'workflow':
+      return ['workflow'];
     case 'inpaint':
+      return ['image'];
     case 'model':
-      return 'image';
+      return ['image', 'model'];
     default:
-      return null;
+      return [];
   }
 }
 
@@ -42,15 +46,15 @@ export function inputType(node: Node, handleId: string | null | undefined): Port
     const input = data.inputs?.find((i) => i.name === handleId);
     return input ? input.type : null;
   }
-  if (node.type === 'generate' && handleId === WORKFLOW_HANDLE) {
-    return 'workflow';
-  }
+  if (node.type === 'generate' && handleId === WORKFLOW_HANDLE) return 'workflow';
+  if (node.type === 'viewer' && handleId === MODEL_HANDLE) return 'model';
+  if (node.type === 'inpaint' && handleId === IMAGE_HANDLE) return 'image';
   return null;
 }
 
 /**
- * Connection is valid when the source's output type matches the target
- * input's expected type. Unknown types are permissive (don't block).
+ * Connection is valid when the source can provide the type the target input
+ * expects. Unknown types are permissive (don't block).
  */
 export function isValidConnection(
   conn: ConnectionLike,
@@ -61,8 +65,8 @@ export function isValidConnection(
   if (!source || !target) return false;
   if (source.id === target.id) return false;
 
-  const out = outputType(source);
   const expected = inputType(target, conn.targetHandle);
-  if (out == null || expected == null) return true;
-  return out === expected;
+  const provides = sourceProvides(source);
+  if (expected == null || provides.length === 0) return true;
+  return provides.includes(expected);
 }

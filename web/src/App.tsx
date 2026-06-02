@@ -21,7 +21,10 @@ import { QuickAdd } from './panels/QuickAdd';
 import { ContextMenu } from './panels/ContextMenu';
 import { WorkflowPicker } from './panels/WorkflowPicker';
 import { SettingsModal } from './panels/SettingsModal';
-import { isValidConnection as checkConnection } from './ports';
+import { MaskEditor } from './panels/MaskEditor';
+import { useViewer3D } from './viewer3d';
+import { isValidConnection as checkConnection, MODEL_HANDLE } from './ports';
+import type { ModelNodeData } from './types';
 import { uploadImageFile, uploadModelFile } from './nodeActions';
 import type { CanvasFileV2 } from './types';
 
@@ -110,6 +113,18 @@ function Canvas() {
     useUI.getState().openContextMenu({ x: e.clientX, y: e.clientY, nodeId: node.id });
   }
 
+  function onNodeDoubleClick(_: React.MouseEvent, node: RFNode) {
+    if (node.type === 'model') {
+      const d = node.data as ModelNodeData;
+      if (d.modelUrl) useViewer3D.getState().openViewer(d.modelUrl, d.filename);
+    } else if (node.type === 'viewer') {
+      const { nodes, edges } = useCanvasStore.getState();
+      const edge = edges.find((e) => e.target === node.id && e.targetHandle === MODEL_HANDLE);
+      const model = edge ? (nodes.find((n) => n.id === edge.source)?.data as ModelNodeData | undefined) : undefined;
+      if (model?.modelUrl) useViewer3D.getState().openViewer(model.modelUrl, model.filename);
+    }
+  }
+
   function onDrop(e: React.DragEvent) {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
@@ -150,6 +165,7 @@ function Canvas() {
         onSelectionChange={onSelectionChange}
         onMoveEnd={onMoveEnd}
         onNodeContextMenu={onNodeContextMenu}
+        onNodeDoubleClick={onNodeDoubleClick}
         onPaneContextMenu={(e) => {
           e.preventDefault();
           useUI.getState().closeContextMenu();
@@ -183,6 +199,7 @@ function Canvas() {
         />
       )}
       {settingsOpen && <SettingsModal onClose={() => useUI.getState().setSettingsOpen(false)} />}
+      <MaskEditor />
     </div>
   );
 }

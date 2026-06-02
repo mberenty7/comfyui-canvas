@@ -93,6 +93,73 @@ body,
 .cv-handle-generate {
   background: #4caf50;
 }
+.cv-handle-model {
+  background: #e94560;
+}
+.cv-handle-inpaint {
+  background: #e94560;
+}
+
+/* ── Model / Viewer / Inpaint nodes ──────────── */
+.cv-node-model,
+.cv-node-viewer,
+.cv-node-inpaint {
+  border-color: #e94560;
+  width: 190px;
+  position: relative;
+}
+.cv-node-inpaint {
+  width: 160px;
+}
+.cv-model-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+.cv-model-icon {
+  font-size: 20px;
+}
+.cv-model-name {
+  font-size: 11px;
+  color: #ccc;
+  word-break: break-all;
+}
+
+/* ── Mask editor ─────────────────────────────── */
+.cv-mask-editor {
+  background: var(--cv-panel);
+  border: 1px solid var(--cv-border);
+  border-radius: 10px;
+  padding: 16px;
+  max-width: 90vw;
+  max-height: 92vh;
+  overflow: auto;
+}
+.cv-mask-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.cv-mask-stage {
+  position: relative;
+  border: 1px solid var(--cv-border);
+  border-radius: 6px;
+  overflow: hidden;
+  touch-action: none;
+}
+.cv-mask-stage img {
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+.cv-mask-stage canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  cursor: crosshair;
+}
 .cv-input-row {
   display: none;
 }

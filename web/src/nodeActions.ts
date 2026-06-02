@@ -2,13 +2,16 @@ import { useCanvasStore } from './store';
 import { useUI } from './ui';
 import { apiUpload } from './api';
 
-export type NodeKind = 'prompt' | 'image' | 'workflow' | 'generate';
+export type NodeKind = 'prompt' | 'image' | 'workflow' | 'generate' | 'model' | 'viewer' | 'inpaint';
 
 /** The node types offered in the Add-node menu and Tab quick-add. */
 export const NODE_KINDS: { type: NodeKind; label: string }[] = [
   { type: 'prompt', label: '✏️ Prompt' },
   { type: 'image', label: '📷 Image' },
   { type: 'workflow', label: '⚙️ Workflow' },
+  { type: 'inpaint', label: '🎨 Inpaint' },
+  { type: 'model', label: '🎲 3D Model' },
+  { type: 'viewer', label: '👁 3D Viewer' },
   { type: 'generate', label: '▶ Generate' },
 ];
 
@@ -114,6 +117,15 @@ export function createNodeAt(type: NodeKind, pos: Pos) {
       break;
     case 'image':
       pickFile('image/*', (file) => uploadImageFile(file, pos));
+      break;
+    case 'model':
+      pickFile('.glb,.gltf,.obj,.fbx', (file) => uploadModelFile(file, pos));
+      break;
+    case 'viewer':
+      store.addNode('viewer', { label: '', connectedModel: null }, { x: pos.x - 90, y: pos.y - 35 });
+      break;
+    case 'inpaint':
+      store.addNode('inpaint', { label: '', connectedImage: null, maskComfyName: null, maskDataUrl: null }, { x: pos.x - 80, y: pos.y - 30 });
       break;
     case 'workflow':
       useUI.getState().openWorkflowPicker(pos);
