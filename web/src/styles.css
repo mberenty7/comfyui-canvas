@@ -261,6 +261,91 @@ body,
   color: #666;
   margin-left: 6px;
 }
+
+/* ── Add-node dropdown ───────────────────────── */
+.cv-dropdown {
+  position: relative;
+}
+.cv-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: #25253f;
+  border: 1px solid var(--cv-border);
+  border-radius: 6px;
+  min-width: 150px;
+  padding: 4px;
+  z-index: 30;
+}
+.cv-dropdown-item {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #ddd;
+}
+.cv-dropdown-item:hover {
+  background: #30304f;
+}
+
+/* ── Quick add (Tab) ─────────────────────────── */
+.cv-quickadd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.cv-quickadd {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 280px;
+  background: #16162a;
+  border: 1px solid var(--cv-border);
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.cv-quickadd-list {
+  margin-top: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.cv-quickadd-item {
+  padding: 7px 10px;
+  font-size: 13px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.cv-quickadd-item:hover {
+  background: #2a2a44;
+}
+.cv-quickadd-empty {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #666;
+}
+
+/* ── Context menu ────────────────────────────── */
+.cv-context-menu {
+  position: fixed;
+  z-index: 50;
+  background: #25253f;
+  border: 1px solid var(--cv-border);
+  border-radius: 6px;
+  padding: 4px;
+  min-width: 160px;
+}
+.cv-context-item {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.cv-context-item:hover {
+  background: #30304f;
+}
 .cv-status-dot {
   cursor: pointer;
   font-size: 14px;

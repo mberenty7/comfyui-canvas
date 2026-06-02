@@ -36,6 +36,7 @@ interface CanvasState {
   addNode: (type: string, data: Record<string, unknown>, position: { x: number; y: number }) => string;
   updateNodeData: (id: string, patch: Record<string, unknown>) => void;
   deleteNode: (id: string) => void;
+  duplicateNode: (id: string) => void;
   disconnectInput: (targetId: string, handle: string) => void;
   addResultEdge: (source: string, target: string) => void;
   setGenStatus: (id: string, status: GenStatus) => void;
@@ -101,6 +102,23 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       edges: get().edges.filter((e) => e.source !== id && e.target !== id),
       selectedId: get().selectedId === id ? null : get().selectedId,
     });
+  },
+
+  duplicateNode: (id) => {
+    const n = get().nodes.find((x) => x.id === id);
+    if (!n) return;
+    const newId = get().nextId();
+    const data = JSON.parse(JSON.stringify(n.data ?? {}));
+    // Don't carry connections to the copy (mirrors the legacy duplicate).
+    if (n.type === 'workflow') data.connectedInputs = {};
+    if (n.type === 'generate') data.connectedWorkflow = null;
+    const node: Node = {
+      id: newId,
+      type: n.type,
+      position: { x: n.position.x + 30, y: n.position.y + 30 },
+      data,
+    };
+    set({ nodes: [...get().nodes, node] });
   },
 
   disconnectInput: (targetId, handle) => {

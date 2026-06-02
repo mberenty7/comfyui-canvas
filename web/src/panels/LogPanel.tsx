@@ -7,6 +7,8 @@ export function LogPanel() {
   const entries = useLogStore((s) => s.entries);
   const clear = useLogStore((s) => s.clear);
   const toggle = useLogStore((s) => s.toggle);
+  const verbose = useLogStore((s) => s.verbose);
+  const setVerbose = useLogStore((s) => s.setVerbose);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to the newest entry.
@@ -20,7 +22,11 @@ export function LogPanel() {
     <div className="cv-log-panel">
       <div className="cv-log-header">
         <h3>📋 Log</h3>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <label style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, color: '#888', cursor: 'pointer' }}>
+            <input type="checkbox" checked={verbose} onChange={(e) => setVerbose(e.target.checked)} />
+            Verbose
+          </label>
           <button className="prop-btn" style={{ padding: '4px 8px', fontSize: 11 }} onClick={clear}>
             Clear
           </button>

@@ -1,86 +1,15 @@
-import { useState } from 'react';
-import { useReactFlow } from '@xyflow/react';
 import { useCanvasStore } from '../store';
 import { useLogStore } from '../logStore';
-import { WorkflowPicker } from './WorkflowPicker';
-import { SettingsModal } from './SettingsModal';
+import { useUI } from '../ui';
+import { AddNodeMenu } from './AddNodeMenu';
 import { StatusDot } from './StatusDot';
 import type { CanvasFileV2 } from '../types';
 
 /**
- * Toolbar for the slice: add Prompt / Image / Workflow nodes, plus Save / Load
- * using the legacy v2 file format so projects interchange with the fabric app.
+ * Toolbar: Add-node dropdown, Save/Load, Log, Settings, and a connection dot.
+ * Node creation lives in nodeActions; modals/menus are driven by the UI store.
  */
 export function Toolbar() {
-  const rf = useReactFlow();
-  const addNode = useCanvasStore((s) => s.addNode);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-
-  function center() {
-    return rf.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
-  }
-
-  function addPrompt() {
-    const c = center();
-    addNode('prompt', { label: '', positive: '', negative: '' }, { x: c.x - 80, y: c.y - 25 });
-  }
-
-  function addGenerate() {
-    const c = center();
-    addNode(
-      'generate',
-      { label: '', count: 1, seedMode: 'increment', baseSeed: Math.floor(Math.random() * 999999), outputName: 'canvas_output', connectedWorkflow: null },
-      { x: c.x - 80, y: c.y - 30 },
-    );
-  }
-
-  function addImage() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      const form = new FormData();
-      form.append('image', file);
-      const result = await (await fetch('/api/upload', { method: 'POST', body: form })).json();
-      if (result.error) {
-        alert('Upload failed: ' + result.error);
-        return;
-      }
-      const dims = await imageDimensions(result.path);
-      const c = center();
-      const id = addNode(
-        'image',
-        {
-          label: '',
-          imageUrl: result.path,
-          filename: result.originalName || file.name,
-          comfyName: result.filename,
-          width: dims.width,
-          height: dims.height,
-          fileSize: file.size,
-          format: file.type.split('/')[1]?.toUpperCase() || '?',
-          needsComfyUpload: true,
-        },
-        { x: c.x - 90, y: c.y - 90 },
-      );
-      // Best-effort upload to ComfyUI so the image can be used as a reference.
-      try {
-        const comfyForm = new FormData();
-        comfyForm.append('image', file);
-        const comfy = await (await fetch('/api/comfy/upload', { method: 'POST', body: comfyForm })).json();
-        if (comfy.comfyName) {
-          useCanvasStore.getState().updateNodeData(id, { comfyName: comfy.comfyName, needsComfyUpload: false });
-        }
-      } catch {
-        /* ComfyUI offline — will upload at generate time */
-      }
-    };
-    input.click();
-  }
-
   function saveCanvas() {
     const data = useCanvasStore.getState().serialize();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -106,39 +35,14 @@ export function Toolbar() {
   }
 
   return (
-    <>
-      <div className="cv-toolbar">
-        <button onClick={addPrompt}>✏️ Prompt</button>
-        <button onClick={addImage}>📷 Image</button>
-        <button onClick={() => setPickerOpen(true)}>⚙️ Workflow</button>
-        <button onClick={addGenerate}>▶ Generate</button>
-        <button onClick={saveCanvas}>💾 Save</button>
-        <button onClick={loadCanvas}>📂 Load</button>
-        <button onClick={() => useLogStore.getState().toggle()}>📋 Log</button>
-        <button onClick={() => setSettingsOpen(true)}>⚙️ Settings</button>
-        <StatusDot onClick={() => setSettingsOpen(true)} />
-        <span className="cv-toolbar-note">React Flow preview</span>
-      </div>
-      {pickerOpen && (
-        <WorkflowPicker
-          onCancel={() => setPickerOpen(false)}
-          onPick={(data) => {
-            setPickerOpen(false);
-            const c = center();
-            addNode('workflow', data, { x: c.x - 90, y: c.y - 35 });
-          }}
-        />
-      )}
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
-    </>
+    <div className="cv-toolbar">
+      <AddNodeMenu />
+      <button onClick={saveCanvas}>💾 Save</button>
+      <button onClick={loadCanvas}>📂 Load</button>
+      <button onClick={() => useLogStore.getState().toggle()}>📋 Log</button>
+      <button onClick={() => useUI.getState().setSettingsOpen(true)}>⚙️ Settings</button>
+      <StatusDot onClick={() => useUI.getState().setSettingsOpen(true)} />
+      <span className="cv-toolbar-note">React Flow preview</span>
+    </div>
   );
-}
-
-function imageDimensions(url: string): Promise<{ width: number; height: number }> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-    img.onerror = () => resolve({ width: 0, height: 0 });
-    img.src = url;
-  });
 }

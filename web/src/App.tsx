@@ -5,21 +5,30 @@ import {
   Background,
   Controls,
   MiniMap,
+  useReactFlow,
   type OnSelectionChangeParams,
   type Viewport,
+  type Node as RFNode,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useCanvasStore } from './store';
+import { useUI } from './ui';
 import { nodeTypes } from './nodes';
 import { Toolbar } from './panels/Toolbar';
 import { PropertiesPanel } from './panels/PropertiesPanel';
 import { LogPanel } from './panels/LogPanel';
+import { QuickAdd } from './panels/QuickAdd';
+import { ContextMenu } from './panels/ContextMenu';
+import { WorkflowPicker } from './panels/WorkflowPicker';
+import { SettingsModal } from './panels/SettingsModal';
 import { isValidConnection as checkConnection } from './ports';
+import { uploadImageFile, uploadModelFile } from './nodeActions';
 import type { CanvasFileV2 } from './types';
 
 const AUTOSAVE_KEY = 'comfyui-canvas-autosave';
 
 function Canvas() {
+  const rf = useReactFlow();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const onNodesChange = useCanvasStore((s) => s.onNodesChange);
@@ -28,10 +37,13 @@ function Canvas() {
   const setSelected = useCanvasStore((s) => s.setSelected);
   const setViewportState = useCanvasStore((s) => s.setViewportState);
 
+  const workflowPickerPos = useUI((s) => s.workflowPickerPos);
+  const settingsOpen = useUI((s) => s.settingsOpen);
+  const quickAddOpen = useUI((s) => s.quickAddOpen);
+
   const restored = useRef(false);
 
-  // Restore from the shared autosave key on first mount (proves cross-app
-  // compatibility: a canvas saved by the fabric app loads here unchanged).
+  // Restore from the shared autosave key on first mount.
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
@@ -62,6 +74,29 @@ function Canvas() {
     };
   }, []);
 
+  // Keyboard: Tab → quick-add, Ctrl/Cmd+D → duplicate selected.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const el = e.target as HTMLElement;
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return;
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        useUI.getState().setQuickAddOpen(true);
+      } else if (e.key.toLowerCase() === 'd' && (e.ctrlKey || e.metaKey)) {
+        const id = useCanvasStore.getState().selectedId;
+        if (id) {
+          e.preventDefault();
+          useCanvasStore.getState().duplicateNode(id);
+        }
+      } else if (e.key === 'Escape') {
+        useUI.getState().setQuickAddOpen(false);
+        useUI.getState().closeContextMenu();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   function onSelectionChange({ nodes: selectedNodes }: OnSelectionChangeParams) {
     setSelected(selectedNodes[0]?.id ?? null);
   }
@@ -70,14 +105,39 @@ function Canvas() {
     setViewportState(viewport);
   }
 
+  function onNodeContextMenu(e: React.MouseEvent, node: RFNode) {
+    e.preventDefault();
+    useUI.getState().openContextMenu({ x: e.clientX, y: e.clientY, nodeId: node.id });
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    const pos = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    if (file.type.startsWith('image/')) uploadImageFile(file, pos);
+    else if (/\.(glb|gltf|obj|fbx)$/i.test(file.name)) uploadModelFile(file, pos);
+  }
+
   return (
-    <div style={{ width: '100vw', height: '100vh' }}>
+    <div
+      style={{ width: '100vw', height: '100vh' }}
+      onDrop={onDrop}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+      }}
+    >
       <Toolbar />
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         deleteKeyCode={['Backspace', 'Delete']}
+        selectionOnDrag
+        panOnDrag={[1]}
+        selectionKeyCode={null}
+        panActivationKeyCode="Space"
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -89,6 +149,11 @@ function Canvas() {
         }
         onSelectionChange={onSelectionChange}
         onMoveEnd={onMoveEnd}
+        onNodeContextMenu={onNodeContextMenu}
+        onPaneContextMenu={(e) => {
+          e.preventDefault();
+          useUI.getState().closeContextMenu();
+        }}
         proOptions={{ hideAttribution: true }}
         fitView
       >
@@ -98,6 +163,19 @@ function Canvas() {
       </ReactFlow>
       <PropertiesPanel />
       <LogPanel />
+      {quickAddOpen && <QuickAdd />}
+      <ContextMenu />
+      {workflowPickerPos && (
+        <WorkflowPicker
+          onCancel={() => useUI.getState().closeWorkflowPicker()}
+          onPick={(data) => {
+            const pos = useUI.getState().workflowPickerPos;
+            useUI.getState().closeWorkflowPicker();
+            if (pos) useCanvasStore.getState().addNode('workflow', data, { x: pos.x - 90, y: pos.y - 35 });
+          }}
+        />
+      )}
+      {settingsOpen && <SettingsModal onClose={() => useUI.getState().setSettingsOpen(false)} />}
     </div>
   );
 }

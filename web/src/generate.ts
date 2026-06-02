@@ -3,7 +3,7 @@ import { useCanvasStore } from './store';
 import { buildWorkflow, type WorkflowGraph } from './nodes/buildWorkflow';
 import { apiGet, apiPost, apiUpload, unwrap } from './api';
 import { WORKFLOW_HANDLE } from './ports';
-import { addLog, useLogStore } from './logStore';
+import { addLog, addVerbose, useLogStore } from './logStore';
 import type { GenerateNodeData, WorkflowNodeData } from './types';
 
 export interface GenResult {
@@ -127,6 +127,7 @@ export async function runGenerate(genId: string): Promise<void> {
     const wfData = wfNode.data as WorkflowNodeData;
 
     store.setGenStatus(genId, { state: 'running', text: 'Starting…' });
+    useLogStore.getState().show(); // surface progress without a manual toggle
     log(`Starting generation — ${wfData.templateName} ×${d.count} (${d.seedMode})`, 'info');
     const seeds = getSeeds(d);
     const results: GenResult[] = [];
@@ -151,6 +152,8 @@ export async function runGenerate(genId: string): Promise<void> {
         for (const key of Object.keys(wf)) {
           if (wf[key].class_type === 'SaveImage') wf[key].inputs.filename_prefix = d.outputName;
         }
+        addVerbose(`Workflow nodes: ${Object.values(wf).map((n) => n.class_type).join(', ')}`, 'info');
+        addVerbose(`Workflow graph: ${JSON.stringify(wf).substring(0, 1500)}`, 'info');
 
         // Use a raw fetch so we can log the full response body before unwrapping.
         const rawResp = await fetch('/api/comfy/prompt', {
@@ -159,7 +162,7 @@ export async function runGenerate(genId: string): Promise<void> {
           body: JSON.stringify({ workflow: wf }),
         });
         const rawJson = await rawResp.json();
-        log(`Prompt response: ${JSON.stringify(rawJson).substring(0, 600)}`, 'info');
+        addVerbose(`Prompt response: ${JSON.stringify(rawJson).substring(0, 600)}`, 'info');
         const resp = unwrap<{
           prompt_id?: string;
           error?: unknown;
@@ -205,6 +208,7 @@ function parseOutputs(
   _wf: WorkflowGraph,
 ) {
   const outputs = result?.outputs ?? {};
+  addVerbose(`Output node keys: ${Object.keys(outputs).join(', ') || '(none)'}`, 'info');
   for (const nodeKey of Object.keys(outputs)) {
     const out = outputs[nodeKey];
     if (out.images) {
