@@ -3,6 +3,7 @@ import { useCanvasStore } from './store';
 import { buildWorkflow, type WorkflowGraph } from './nodes/buildWorkflow';
 import { apiGet, apiPost, apiUpload } from './api';
 import { WORKFLOW_HANDLE } from './ports';
+import { addLog, useLogStore } from './logStore';
 import type { GenerateNodeData, WorkflowNodeData } from './types';
 
 export interface GenResult {
@@ -14,11 +15,11 @@ export interface GenResult {
   type?: '3d';
 }
 
-// Lightweight logger — TODO: route to a Log panel once it's ported.
+// Route generation logs to the Log panel (and the console for good measure).
 function log(msg: string, level: 'info' | 'warn' | 'error' | 'success' = 'info') {
+  addLog(msg, level);
   if (level === 'error') console.error(msg);
   else if (level === 'warn') console.warn(msg);
-  else console.log(msg);
 }
 
 function getNode(id: string): Node | undefined {
@@ -126,11 +127,13 @@ export async function runGenerate(genId: string): Promise<void> {
     const wfData = wfNode.data as WorkflowNodeData;
 
     store.setGenStatus(genId, { state: 'running', text: 'Starting…' });
+    log(`Starting generation — ${wfData.templateName} ×${d.count} (${d.seedMode})`, 'info');
     const seeds = getSeeds(d);
     const results: GenResult[] = [];
 
     for (let i = 0; i < seeds.length; i++) {
       store.setGenStatus(genId, { state: 'running', text: `${i + 1}/${seeds.length}…` });
+      log(`Generation ${i + 1}/${seeds.length} — seed ${seeds[i]}`, 'info');
       try {
         const connectedInputs = connectedInputsFor(wfNode.id, useCanvasStore.getState().edges);
 
@@ -160,6 +163,7 @@ export async function runGenerate(genId: string): Promise<void> {
           throw new Error(errs);
         }
         if (!resp.prompt_id) throw new Error('No prompt_id returned — submission may have failed');
+        log(`Submitted to ComfyUI (prompt ${resp.prompt_id.substring(0, 12)}…)`, 'info');
 
         const result = await pollResult(resp.prompt_id);
         parseOutputs(result, seeds[i], wfData, connectedInputs, d, results, wf);
@@ -171,9 +175,11 @@ export async function runGenerate(genId: string): Promise<void> {
 
     await placeResults(genId, gen.position, results);
     store.setGenStatus(genId, { state: 'done', text: `Done — ${results.length} image${results.length !== 1 ? 's' : ''}` });
+    log(`Generation complete — ${results.length} image${results.length !== 1 ? 's' : ''}`, 'success');
   } catch (err) {
     store.setGenStatus(genId, { state: 'error', text: `Error: ${(err as Error).message}` });
-    alert(`Generation failed: ${(err as Error).message}`);
+    log(`Generation failed: ${(err as Error).message}`, 'error');
+    useLogStore.getState().show(); // surface the failure without a console dive
   }
 }
 

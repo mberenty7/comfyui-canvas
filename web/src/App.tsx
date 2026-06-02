@@ -13,6 +13,7 @@ import { useCanvasStore } from './store';
 import { nodeTypes } from './nodes';
 import { Toolbar } from './panels/Toolbar';
 import { PropertiesPanel } from './panels/PropertiesPanel';
+import { LogPanel } from './panels/LogPanel';
 import { isValidConnection as checkConnection } from './ports';
 import type { CanvasFileV2 } from './types';
 
@@ -95,6 +96,7 @@ function Canvas() {
         <MiniMap pannable zoomable />
       </ReactFlow>
       <PropertiesPanel />
+      <LogPanel />
     </div>
   );
 }

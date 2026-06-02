@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { useCanvasStore } from '../store';
+import { useLogStore } from '../logStore';
 import { WorkflowPicker } from './WorkflowPicker';
 import type { CanvasFileV2 } from '../types';
 
@@ -110,6 +111,7 @@ export function Toolbar() {
         <button onClick={addGenerate}>▶ Generate</button>
         <button onClick={saveCanvas}>💾 Save</button>
         <button onClick={loadCanvas}>📂 Load</button>
+        <button onClick={() => useLogStore.getState().toggle()}>📋 Log</button>
         <span className="cv-toolbar-note">React Flow preview</span>
       </div>
       {pickerOpen && (

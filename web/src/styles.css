@@ -116,6 +116,68 @@ body,
   background: #4a9eff;
 }
 
+/* ── Log panel ───────────────────────────────── */
+.cv-log-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 220px;
+  background: #0f1a2e;
+  border-top: 1px solid var(--cv-border);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+}
+.cv-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--cv-border);
+}
+.cv-log-header h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.cv-log-close {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 16px;
+}
+.cv-log-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  font-family: monospace;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.cv-log-empty {
+  color: #555;
+}
+.cv-log-entry {
+  padding: 2px 0;
+  border-bottom: 1px solid #1a1a2e;
+  color: #888;
+}
+.cv-log-entry.error {
+  color: #ff4444;
+}
+.cv-log-entry.success {
+  color: #4caf50;
+}
+.cv-log-entry.warn {
+  color: #ff9800;
+}
+.cv-log-time {
+  color: #555;
+  margin-right: 8px;
+}
+
 /* ── Workflow picker modal ───────────────────── */
 .cv-modal-overlay {
   position: fixed;
