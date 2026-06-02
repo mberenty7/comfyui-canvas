@@ -26,8 +26,8 @@ module.exports = function createComfyRouter({ configRef, upload, UPLOAD_DIR }) {
         comfyName: result.name || localName,
         originalName: file.originalname,
       });
-    } catch (err) {
-      return err(res, 'COMFY_ROUTE_ERROR', err.message, 500);
+    } catch (e) {
+      return err(res, 'COMFY_ROUTE_ERROR', e.message, 500);
     }
   });
 
@@ -40,8 +40,8 @@ module.exports = function createComfyRouter({ configRef, upload, UPLOAD_DIR }) {
       }
       const result = await proxyRequest(config.comfyUrl, 'POST', '/prompt', payload);
       return ok(res, result.data);
-    } catch (err) {
-      return err(res, 'COMFY_ROUTE_ERROR', err.message, 500);
+    } catch (e) {
+      return err(res, 'COMFY_ROUTE_ERROR', e.message, 500);
     }
   });
 
@@ -50,8 +50,8 @@ module.exports = function createComfyRouter({ configRef, upload, UPLOAD_DIR }) {
       const config = configRef();
       const result = await proxyRequest(config.comfyUrl, 'GET', `/history/${req.params.promptId}`);
       return ok(res, result.data);
-    } catch (err) {
-      return err(res, 'COMFY_ROUTE_ERROR', err.message, 500);
+    } catch (e) {
+      return err(res, 'COMFY_ROUTE_ERROR', e.message, 500);
     }
   });
 
@@ -74,8 +74,8 @@ module.exports = function createComfyRouter({ configRef, upload, UPLOAD_DIR }) {
           return res.send(Buffer.concat(chunks));
         });
       }).on('error', e => err(res, 'COMFY_VIEW_ERROR', e.message, 500));
-    } catch (err) {
-      return err(res, 'COMFY_ROUTE_ERROR', err.message, 500);
+    } catch (e) {
+      return err(res, 'COMFY_ROUTE_ERROR', e.message, 500);
     }
   });
 
@@ -84,8 +84,8 @@ module.exports = function createComfyRouter({ configRef, upload, UPLOAD_DIR }) {
       const config = configRef();
       const result = await proxyRequest(config.comfyUrl, 'GET', '/system_stats');
       return ok(res, { connected: true, ...result.data });
-    } catch (err) {
-      return err(res, 'COMFY_DISCONNECTED', err.message, 200);
+    } catch (e) {
+      return err(res, 'COMFY_DISCONNECTED', e.message, 200);
     }
   });
 

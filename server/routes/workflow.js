@@ -107,8 +107,8 @@ module.exports = function createWorkflowRouter({ rootDir, configRef }) {
         }
       }
       throw new Error(`Timed out after ${timeout}s`);
-    } catch (err) {
-      return err(res, 'WORKFLOW_RUN_FAILED', err.message, 500, { runId });
+    } catch (e) {
+      return err(res, 'WORKFLOW_RUN_FAILED', e.message, 500, { runId });
     }
   });
 
