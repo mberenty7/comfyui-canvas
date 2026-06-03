@@ -23,6 +23,8 @@ import { WorkflowPicker } from './panels/WorkflowPicker';
 import { SettingsModal } from './panels/SettingsModal';
 import { MaskEditor } from './panels/MaskEditor';
 import { Viewer3DModal } from './panels/Viewer3DModal';
+import { PromptLibrary } from './panels/PromptLibrary';
+import { Gallery } from './panels/Gallery';
 import { useViewer3D } from './viewer3d';
 import { isValidConnection as checkConnection, MODEL_HANDLE } from './ports';
 import type { ModelNodeData } from './types';
@@ -44,6 +46,8 @@ function Canvas() {
   const workflowPickerPos = useUI((s) => s.workflowPickerPos);
   const settingsOpen = useUI((s) => s.settingsOpen);
   const quickAddOpen = useUI((s) => s.quickAddOpen);
+  const promptsOpen = useUI((s) => s.promptsOpen);
+  const galleryOpen = useUI((s) => s.galleryOpen);
 
   const restored = useRef(false);
 
@@ -202,6 +206,8 @@ function Canvas() {
       {settingsOpen && <SettingsModal onClose={() => useUI.getState().setSettingsOpen(false)} />}
       <MaskEditor />
       <Viewer3DModal />
+      {promptsOpen && <PromptLibrary />}
+      {galleryOpen && <Gallery />}
     </div>
   );
 }

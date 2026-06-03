@@ -196,6 +196,187 @@ body,
   background: #4a9eff;
 }
 
+/* ── Left dock: Prompt Library / Gallery ─────── */
+.cv-side-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 320px;
+  height: 100vh;
+  background: var(--cv-panel);
+  border-right: 1px solid var(--cv-border);
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+}
+.cv-side-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--cv-border);
+}
+.cv-side-header h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.cv-side-search {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--cv-border);
+}
+.cv-side-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px;
+}
+.cv-side-empty {
+  color: #666;
+  font-size: 12px;
+  text-align: center;
+  padding: 20px 8px;
+}
+.cv-card {
+  background: #1e1e3a;
+  border: 1px solid var(--cv-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.cv-card:hover {
+  border-color: #a855f7;
+}
+.cv-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ddd;
+}
+.cv-card-text {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 3px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.cv-card-neg {
+  font-size: 11px;
+  color: #c0566a;
+  margin-top: 3px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.cv-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+}
+.cv-card-date {
+  font-size: 10px;
+  color: #666;
+}
+.cv-card-btn {
+  background: #2a2a44;
+  border: 1px solid var(--cv-border);
+  border-radius: 4px;
+  color: #ccc;
+  font-size: 11px;
+  padding: 3px 7px;
+  cursor: pointer;
+}
+.cv-card-btn:hover {
+  background: #34345a;
+}
+.cv-card-del:hover {
+  background: #5a2a2a;
+}
+
+/* ── Gallery grid + lightbox ─────────────────── */
+.cv-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.cv-thumb {
+  cursor: pointer;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #1e1e3a;
+  border: 1px solid var(--cv-border);
+}
+.cv-thumb img {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  display: block;
+}
+.cv-thumb-name {
+  font-size: 9px;
+  color: #888;
+  padding: 3px 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cv-lightbox {
+  background: var(--cv-panel);
+  border: 1px solid var(--cv-border);
+  border-radius: 10px;
+  padding: 16px;
+  max-width: 85vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+.cv-lightbox-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.cv-lightbox-body {
+  flex: 1;
+  display: flex;
+  gap: 12px;
+  overflow: hidden;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+}
+.cv-lightbox-img {
+  max-width: 60vw;
+  max-height: 72vh;
+  border-radius: 6px;
+}
+.cv-lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  border: none;
+  color: #fff;
+  font-size: 22px;
+  padding: 12px 8px;
+  cursor: pointer;
+  z-index: 1;
+}
+.cv-lightbox-meta {
+  width: 260px;
+  overflow-y: auto;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.cv-meta-label {
+  color: #888;
+  font-size: 10px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
 /* ── Log panel ───────────────────────────────── */
 .cv-log-panel {
   position: absolute;

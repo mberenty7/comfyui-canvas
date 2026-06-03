@@ -39,6 +39,8 @@ export function Toolbar() {
       <AddNodeMenu />
       <button onClick={saveCanvas}>💾 Save</button>
       <button onClick={loadCanvas}>📂 Load</button>
+      <button onClick={() => useUI.getState().togglePrompts()}>📝 Prompts</button>
+      <button onClick={() => useUI.getState().toggleGallery()}>🖼️ Gallery</button>
       <button onClick={() => useLogStore.getState().toggle()}>📋 Log</button>
       <button onClick={() => useUI.getState().setSettingsOpen(true)}>⚙️ Settings</button>
       <StatusDot onClick={() => useUI.getState().setSettingsOpen(true)} />

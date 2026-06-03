@@ -256,7 +256,7 @@ app.delete('/api/prompts/:filename', (req, res) => {
 // Browse ComfyUI output history
 app.get('/api/gallery', async (req, res) => {
   try {
-    const histResult = await proxyRequest('GET', '/history?max_items=100');
+    const histResult = await proxyRequest(config.comfyUrl, 'GET', '/history?max_items=100');
     if (histResult.status !== 200) return res.json({ images: [] });
 
     const images = [];
@@ -373,7 +373,7 @@ app.get('/api/comfy/mesh', async (req, res) => {
     // Sanitize filename
     const safe = path.basename(filename);
     const params = new URLSearchParams({ filename: safe, subfolder: 'mesh', type: 'output' });
-    const result = await proxyRequest('GET', '/view?' + params.toString());
+    const result = await proxyRequest(config.comfyUrl, 'GET', '/view?' + params.toString());
     if (result.status !== 200) return res.status(result.status).json({ error: 'Failed to fetch mesh from ComfyUI' });
     const ext = path.extname(safe).toLowerCase();
     const mimeTypes = { '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.obj': 'text/plain', '.fbx': 'application/octet-stream' };
@@ -406,12 +406,12 @@ app.post('/api/comfy/save-mesh', async (req, res) => {
 
     // Save to uploads/ dir always
     const params = new URLSearchParams({ filename: safe, subfolder: 'mesh', type: 'output' });
-    const result = await proxyRequest('GET', '/view?' + params.toString());
+    const result = await proxyRequest(config.comfyUrl, 'GET', '/view?' + params.toString());
 
     if (result.status !== 200) {
       // Try without subfolder
       const params2 = new URLSearchParams({ filename: safe, subfolder: '', type: 'output' });
-      const result2 = await proxyRequest('GET', '/view?' + params2.toString());
+      const result2 = await proxyRequest(config.comfyUrl, 'GET', '/view?' + params2.toString());
       if (result2.status !== 200) {
         return res.status(404).json({ error: 'Mesh file not found in ComfyUI output' });
       }
@@ -523,7 +523,7 @@ app.post('/api/comfy/sam3-segment', async (req, res) => {
     // Poll for result (max 30 seconds)
     for (let i = 0; i < 60; i++) {
       await new Promise(r => setTimeout(r, 500));
-      const histResult = await proxyRequest('GET', '/history/' + promptId);
+      const histResult = await proxyRequest(config.comfyUrl, 'GET', '/history/' + promptId);
       const entry = histResult.data?.[promptId];
       if (entry?.status?.completed) {
         // Find the mask output (node 6 = MaskToImage -> SaveImage)
