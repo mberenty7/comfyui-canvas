@@ -525,7 +525,9 @@ class Viewer3D {
     formData.append('image', blob, filename);
 
     const resp = await fetch('/api/comfy/upload', { method: 'POST', body: formData });
-    const result = await resp.json();
+    const raw = await resp.json();
+    // /api/comfy/upload wraps its payload as { ok, data }.
+    const result = (raw && typeof raw === 'object' && 'ok' in raw) ? (raw.data || {}) : raw;
 
     // Parse dimensions from the dataURL
     const dims = await new Promise(resolve => {
