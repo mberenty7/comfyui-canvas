@@ -6,14 +6,17 @@ import { useViewer3D } from '../viewer3d';
 import { useMaskEditor } from '../maskEditor';
 import { apiUpload } from '../api';
 import { addLog } from '../logStore';
-import { resolveImageUrl, loadImage, processColorPick, processOverlay, sampleColor, uploadCanvas } from '../imageProc';
+import { resolveImageUrl, loadImage, processColorPick, processOverlay, processGrade, sampleColor, uploadCanvas } from '../imageProc';
+import { usePaintEditor } from '../paintEditor';
 import type {
   ColorPickNodeData,
   GenerateNodeData,
+  GradeNodeData,
   ImageNodeData,
   InpaintNodeData,
   ModelNodeData,
   OverlayNodeData,
+  PaintNodeData,
   PromptNodeData,
   TemplateParam,
   ViewerNodeData,
@@ -93,7 +96,9 @@ export function PropertiesPanel() {
         {node.type === 'inpaint' && <InpaintProperties id={node.id} data={node.data as InpaintNodeData} onChange={updateNodeData} />}
         {node.type === 'colorpick' && <ColorPickProperties id={node.id} data={node.data as ColorPickNodeData} onChange={updateNodeData} />}
         {node.type === 'overlay' && <OverlayProperties id={node.id} data={node.data as OverlayNodeData} onChange={updateNodeData} />}
-        {!['prompt', 'image', 'workflow', 'generate', 'model', 'viewer', 'inpaint', 'colorpick', 'overlay'].includes(node.type ?? '') && (
+        {node.type === 'grade' && <GradeProperties id={node.id} data={node.data as GradeNodeData} onChange={updateNodeData} />}
+        {node.type === 'paint' && <PaintProperties id={node.id} data={node.data as PaintNodeData} onChange={updateNodeData} />}
+        {!['prompt', 'image', 'workflow', 'generate', 'model', 'viewer', 'inpaint', 'colorpick', 'overlay', 'grade', 'paint'].includes(node.type ?? '') && (
           <div className="prop-section">
             <label className="prop-section-label">Type</label>
             <div className="prop-value">{node.type}</div>
@@ -797,6 +802,157 @@ function OverlayProperties({
         </>
       )}
     </>
+  );
+}
+
+// rgb '#ffffff' is the identity multiplier (255 → 1.0 per channel).
+const GRADE_DEFAULTS = { gain: 1, gamma: 1, saturation: 1, hue: 0, rgb: '#ffffff' };
+
+function GradeProperties({
+  id,
+  data,
+  onChange,
+}: {
+  id: string;
+  data: GradeNodeData;
+  onChange: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  const { img, connected } = useSourceImage(id, 'image');
+  const [preview, setPreview] = useState('');
+  const params = { gain: data.gain, gamma: data.gamma, saturation: data.saturation, hue: data.hue, rgb: data.rgb };
+
+  useEffect(() => {
+    if (!img) {
+      setPreview('');
+      return;
+    }
+    const t = setTimeout(() => setPreview(processGrade(img, params).toDataURL('image/png')), 150);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [img, data.gain, data.gamma, data.saturation, data.hue, data.rgb]);
+
+  async function save() {
+    if (!img) return;
+    const up = await uploadCanvas(processGrade(img, params), `grade_${id}.png`);
+    onChange(id, { resultUrl: up.url, comfyName: up.comfyName, width: up.width, height: up.height });
+    addLog('Graded image saved', 'success');
+  }
+
+  return (
+    <>
+      <LabelField id={id} label={data.label} onChange={onChange} placeholder="e.g. Warm grade" />
+      {!connected ? (
+        <p className="cv-proc-hint">Connect an image to the input port.</p>
+      ) : (
+        <>
+          <Slider label="Gain" min={0} max={4} step={0.01} value={data.gain} onChange={(v) => onChange(id, { gain: v })} />
+          <Slider label="Gamma" min={0.2} max={5} step={0.01} value={data.gamma} onChange={(v) => onChange(id, { gamma: v })} />
+          <Slider label="Saturation" min={0} max={3} step={0.01} value={data.saturation} onChange={(v) => onChange(id, { saturation: v })} />
+          <Slider label="Hue Shift" min={-180} max={180} step={1} value={data.hue} onChange={(v) => onChange(id, { hue: v })} />
+          <div className="prop-section">
+            <label className="prop-section-label">RGB Multiply</label>
+            <input type="color" value={data.rgb} onChange={(e) => onChange(id, { rgb: e.target.value })} />
+          </div>
+          {preview && (
+            <div className="prop-section">
+              <label className="prop-section-label">Preview</label>
+              <img className="cv-proc-preview" src={preview} alt="grade preview" />
+            </div>
+          )}
+          <div className="prop-actions">
+            <button className="prop-btn" onClick={() => onChange(id, GRADE_DEFAULTS)}>Reset</button>
+            <button className="generate-btn" style={{ width: 'auto', flex: 1 }} onClick={save}>💾 Save</button>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+function PaintProperties({
+  id,
+  data,
+  onChange,
+}: {
+  id: string;
+  data: PaintNodeData;
+  onChange: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  const { img, connected } = useSourceImage(id, 'image');
+
+  function paint() {
+    if (!img) return;
+    usePaintEditor.getState().open({
+      imageUrl: data.resultUrl || img.src,
+      width: img.naturalWidth,
+      height: img.naturalHeight,
+      onSave: async (dataUrl) => {
+        const canvas = await dataUrlToCanvas(dataUrl);
+        const up = await uploadCanvas(canvas, `paint_${id}.png`);
+        onChange(id, { resultUrl: up.url, comfyName: up.comfyName, width: up.width, height: up.height });
+        addLog('Painted image saved', 'success');
+      },
+    });
+  }
+
+  return (
+    <>
+      <LabelField id={id} label={data.label} onChange={onChange} placeholder="e.g. Annotation" />
+      {!connected ? (
+        <p className="cv-proc-hint">Connect an image to the input port.</p>
+      ) : (
+        <>
+          <div className="prop-section">
+            <button className="generate-btn" onClick={paint}>🖌 {data.resultUrl ? 'Edit Paint' : 'Paint'}</button>
+          </div>
+          {data.resultUrl && (
+            <div className="prop-section">
+              <img className="cv-proc-preview" src={data.resultUrl} alt="painted" />
+              <button className="prop-btn" style={{ marginTop: 4, fontSize: 11, padding: '4px 8px', width: '100%' }} onClick={() => onChange(id, { resultUrl: null, comfyName: null })}>
+                🗑 Clear
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+function dataUrlToCanvas(dataUrl: string): Promise<HTMLCanvasElement> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth;
+      c.height = img.naturalHeight;
+      c.getContext('2d')!.drawImage(img, 0, 0);
+      resolve(c);
+    };
+    img.src = dataUrl;
+  });
+}
+
+function Slider({
+  label,
+  min,
+  max,
+  step,
+  value,
+  onChange,
+}: {
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="prop-section">
+      <label className="prop-section-label">{label} ({value})</label>
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(parseFloat(e.target.value))} />
+    </div>
   );
 }
 

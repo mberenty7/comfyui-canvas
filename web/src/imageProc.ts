@@ -106,6 +106,68 @@ export function sampleColor(img: HTMLImageElement, nx: number, ny: number): stri
   return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
 }
 
+export interface GradeParams {
+  gain: number; // 0–4
+  gamma: number; // 0.2–5
+  saturation: number; // 0–3
+  hue: number; // -180..180 degrees
+  rgb: string; // hex per-channel multiplier
+}
+
+/**
+ * Nuke-style grade. Pipeline order (per spec): RGB multiply → gain → gamma →
+ * saturation → hue shift.
+ */
+export function processGrade(img: HTMLImageElement, p: GradeParams): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(img, 0, 0);
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const px = data.data;
+  const [mr, mg, mb] = hexToRgb(p.rgb).map((v) => v / 255) as [number, number, number];
+  const invGamma = 1 / p.gamma;
+  const hueRad = (p.hue * Math.PI) / 180;
+  const cosH = Math.cos(hueRad);
+  const sinH = Math.sin(hueRad);
+
+  for (let i = 0; i < px.length; i += 4) {
+    let r = px[i] / 255;
+    let g = px[i + 1] / 255;
+    let b = px[i + 2] / 255;
+
+    // RGB multiply (per-channel)
+    r *= mr; g *= mg; b *= mb;
+    // Gain
+    r *= p.gain; g *= p.gain; b *= p.gain;
+    // Gamma
+    r = Math.pow(Math.max(0, r), invGamma);
+    g = Math.pow(Math.max(0, g), invGamma);
+    b = Math.pow(Math.max(0, b), invGamma);
+    // Saturation (around luma)
+    const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    r = luma + (r - luma) * p.saturation;
+    g = luma + (g - luma) * p.saturation;
+    b = luma + (b - luma) * p.saturation;
+    // Hue shift (YIQ rotation)
+    const y = 0.299 * r + 0.587 * g + 0.114 * b;
+    const I = 0.596 * r - 0.274 * g - 0.322 * b;
+    const Q = 0.211 * r - 0.523 * g + 0.312 * b;
+    const I2 = I * cosH - Q * sinH;
+    const Q2 = I * sinH + Q * cosH;
+    r = y + 0.956 * I2 + 0.621 * Q2;
+    g = y - 0.272 * I2 - 0.647 * Q2;
+    b = y - 1.106 * I2 + 1.703 * Q2;
+
+    px[i] = Math.max(0, Math.min(255, r * 255));
+    px[i + 1] = Math.max(0, Math.min(255, g * 255));
+    px[i + 2] = Math.max(0, Math.min(255, b * 255));
+  }
+  ctx.putImageData(data, 0, 0);
+  return canvas;
+}
+
 /** Upload a canvas as a PNG to ComfyUI and return its URL + comfyName. */
 export async function uploadCanvas(canvas: HTMLCanvasElement, filename: string) {
   const blob: Blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b!), 'image/png'));

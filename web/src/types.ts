@@ -129,6 +129,19 @@ export interface OverlayNodeData extends ProcResultData {
   [key: string]: unknown;
 }
 
+export interface GradeNodeData extends ProcResultData {
+  gain: number;
+  gamma: number;
+  saturation: number;
+  hue: number;
+  rgb: string; // hex per-channel multiplier
+  [key: string]: unknown;
+}
+
+export interface PaintNodeData extends ProcResultData {
+  [key: string]: unknown;
+}
+
 /** Output port "type" a node emits, used for connection validation. */
 export type PortType = 'image' | 'prompt' | 'workflow' | 'model';
 

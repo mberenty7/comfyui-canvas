@@ -22,6 +22,7 @@ import { ContextMenu } from './panels/ContextMenu';
 import { WorkflowPicker } from './panels/WorkflowPicker';
 import { SettingsModal } from './panels/SettingsModal';
 import { MaskEditor } from './panels/MaskEditor';
+import { PaintModal } from './panels/PaintModal';
 import { Viewer3DModal } from './panels/Viewer3DModal';
 import { PromptLibrary } from './panels/PromptLibrary';
 import { Gallery } from './panels/Gallery';
@@ -205,6 +206,7 @@ function Canvas() {
       )}
       {settingsOpen && <SettingsModal onClose={() => useUI.getState().setSettingsOpen(false)} />}
       <MaskEditor />
+      <PaintModal />
       <Viewer3DModal />
       {promptsOpen && <PromptLibrary />}
       {galleryOpen && <Gallery />}

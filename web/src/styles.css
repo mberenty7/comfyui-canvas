@@ -117,6 +117,14 @@ body,
   border-radius: 4px;
   display: block;
 }
+.cv-swatch {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+}
 .cv-handle-model {
   background: #e94560;
 }
