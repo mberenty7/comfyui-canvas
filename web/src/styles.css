@@ -93,6 +93,30 @@ body,
 .cv-handle-generate {
   background: #4caf50;
 }
+
+/* ── Processing nodes (Color Pick / Overlay) ─── */
+.cv-node-proc {
+  border-color: #a855f7;
+  width: 180px;
+  position: relative;
+}
+.cv-proc-hint {
+  font-size: 11px;
+  color: #666;
+  margin: 4px 0;
+}
+.cv-proc-sample {
+  width: 100%;
+  border-radius: 4px;
+  cursor: crosshair;
+  display: block;
+}
+.cv-proc-preview {
+  width: 100%;
+  border: 1px solid var(--cv-border);
+  border-radius: 4px;
+  display: block;
+}
 .cv-handle-model {
   background: #e94560;
 }

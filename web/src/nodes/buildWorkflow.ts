@@ -125,7 +125,9 @@ export async function buildWorkflow(
         const node = wf[tn.node];
         if (node) node.inputs[tn.field] = (srcData.negative as string) || '';
       }
-    } else if (input.type === 'image' && source.type === 'image') {
+    } else if (input.type === 'image' && srcData.comfyName) {
+      // Any image-producing source (image, model capture, or a processing
+      // node like Color Pick / Overlay / Grade / Paint) exposes comfyName.
       const targetNodeId = input.target_node as string | undefined;
       if (targetNodeId) {
         const node = wf[targetNodeId];

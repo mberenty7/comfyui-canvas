@@ -9,6 +9,9 @@ const SINGLE_CONN: Record<string, [string, string]> = {
   inpaint: ['connectedImage', IMAGE_HANDLE],
 };
 
+/** Node types that store a handle-keyed connectedInputs map (multi-input). */
+const MULTI_CONN = new Set(['workflow', 'colorpick', 'overlay', 'grade', 'paint']);
+
 /**
  * Keys that live at the top level of a legacy node object and therefore must
  * NOT be folded into React Flow's `data` bag (they map to id/type/position).
@@ -47,7 +50,7 @@ export function fromCanvasFormat(data: CanvasFileV2): DeserializeResult {
   const edges: Edge[] = (data.connections ?? []).map((c) => {
     const target = byId.get(c.toId);
     let targetHandle: string | undefined;
-    if (target?.type === 'workflow') {
+    if (target && MULTI_CONN.has(target.type)) {
       const connectedInputs = (target.connectedInputs ?? {}) as Record<string, { nodeId: string }>;
       targetHandle = Object.keys(connectedInputs).find((k) => connectedInputs[k]?.nodeId === c.fromId);
     } else if (target && SINGLE_CONN[target.type]) {
@@ -99,7 +102,7 @@ export function toCanvasFormat(nodes: Node[], edges: Edge[], meta: SerializeMeta
     const data = (n.data ?? {}) as Record<string, unknown>;
     const safeData = { ...data };
     for (const k of RESERVED_KEYS) delete safeData[k];
-    if (n.type === 'workflow') {
+    if (MULTI_CONN.has(n.type ?? '')) {
       safeData.connectedInputs = connectedInputsByNode.get(n.id) ?? {};
     } else if (SINGLE_CONN[n.type ?? '']) {
       const [field, handle] = SINGLE_CONN[n.type as string];

@@ -2,7 +2,7 @@ import { useCanvasStore } from './store';
 import { useUI } from './ui';
 import { apiUpload } from './api';
 
-export type NodeKind = 'prompt' | 'image' | 'workflow' | 'generate' | 'model' | 'viewer' | 'inpaint';
+export type NodeKind = 'prompt' | 'image' | 'workflow' | 'generate' | 'model' | 'viewer' | 'inpaint' | 'colorpick' | 'overlay';
 
 /** The node types offered in the Add-node menu and Tab quick-add. */
 export const NODE_KINDS: { type: NodeKind; label: string }[] = [
@@ -10,6 +10,8 @@ export const NODE_KINDS: { type: NodeKind; label: string }[] = [
   { type: 'image', label: '📷 Image' },
   { type: 'workflow', label: '⚙️ Workflow' },
   { type: 'inpaint', label: '🎨 Inpaint' },
+  { type: 'colorpick', label: '🎯 Color Pick' },
+  { type: 'overlay', label: '🟥 Overlay' },
   { type: 'model', label: '🎲 3D Model' },
   { type: 'viewer', label: '👁 3D Viewer' },
   { type: 'generate', label: '▶ Generate' },
@@ -126,6 +128,12 @@ export function createNodeAt(type: NodeKind, pos: Pos) {
       break;
     case 'inpaint':
       store.addNode('inpaint', { label: '', connectedImage: null, maskComfyName: null, maskDataUrl: null }, { x: pos.x - 80, y: pos.y - 30 });
+      break;
+    case 'colorpick':
+      store.addNode('colorpick', { label: '', pickColor: '#3cb44b', tolerance: 30, resultUrl: null, comfyName: null }, { x: pos.x - 80, y: pos.y - 40 });
+      break;
+    case 'overlay':
+      store.addNode('overlay', { label: '', color: '#ff0000', opacity: 50, invert: false, expand: 0, resultUrl: null, comfyName: null }, { x: pos.x - 80, y: pos.y - 40 });
       break;
     case 'workflow':
       useUI.getState().openWorkflowPicker(pos);

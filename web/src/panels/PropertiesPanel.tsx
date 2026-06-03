@@ -6,11 +6,14 @@ import { useViewer3D } from '../viewer3d';
 import { useMaskEditor } from '../maskEditor';
 import { apiUpload } from '../api';
 import { addLog } from '../logStore';
+import { resolveImageUrl, loadImage, processColorPick, processOverlay, sampleColor, uploadCanvas } from '../imageProc';
 import type {
+  ColorPickNodeData,
   GenerateNodeData,
   ImageNodeData,
   InpaintNodeData,
   ModelNodeData,
+  OverlayNodeData,
   PromptNodeData,
   TemplateParam,
   ViewerNodeData,
@@ -88,7 +91,9 @@ export function PropertiesPanel() {
         {node.type === 'model' && <ModelProperties id={node.id} data={node.data as ModelNodeData} onChange={updateNodeData} />}
         {node.type === 'viewer' && <ViewerProperties id={node.id} data={node.data as ViewerNodeData} onChange={updateNodeData} />}
         {node.type === 'inpaint' && <InpaintProperties id={node.id} data={node.data as InpaintNodeData} onChange={updateNodeData} />}
-        {!['prompt', 'image', 'workflow', 'generate', 'model', 'viewer', 'inpaint'].includes(node.type ?? '') && (
+        {node.type === 'colorpick' && <ColorPickProperties id={node.id} data={node.data as ColorPickNodeData} onChange={updateNodeData} />}
+        {node.type === 'overlay' && <OverlayProperties id={node.id} data={node.data as OverlayNodeData} onChange={updateNodeData} />}
+        {!['prompt', 'image', 'workflow', 'generate', 'model', 'viewer', 'inpaint', 'colorpick', 'overlay'].includes(node.type ?? '') && (
           <div className="prop-section">
             <label className="prop-section-label">Type</label>
             <div className="prop-value">{node.type}</div>
@@ -635,6 +640,182 @@ function InpaintProperties({
         )}
       </div>
     </>
+  );
+}
+
+function useSourceImage(nodeId: string, handle: string) {
+  const edges = useCanvasStore((s) => s.edges);
+  const edge = edges.find((e) => e.target === nodeId && e.targetHandle === handle);
+  const url = edge ? resolveImageUrl(edge.source) : null;
+  const [img, setImg] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    if (!url) {
+      setImg(null);
+      return;
+    }
+    let cancelled = false;
+    loadImage(url).then((i) => !cancelled && setImg(i)).catch(() => !cancelled && setImg(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+  return { img, connected: !!edge };
+}
+
+function ColorPickProperties({
+  id,
+  data,
+  onChange,
+}: {
+  id: string;
+  data: ColorPickNodeData;
+  onChange: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  const { img, connected } = useSourceImage(id, 'image');
+  const [preview, setPreview] = useState('');
+
+  useEffect(() => {
+    if (!img) {
+      setPreview('');
+      return;
+    }
+    const t = setTimeout(() => setPreview(processColorPick(img, data.pickColor, data.tolerance).toDataURL('image/png')), 100);
+    return () => clearTimeout(t);
+  }, [img, data.pickColor, data.tolerance]);
+
+  async function capture() {
+    if (!img) return;
+    const up = await uploadCanvas(processColorPick(img, data.pickColor, data.tolerance), `colorpick_${id}.png`);
+    onChange(id, { resultUrl: up.url, comfyName: up.comfyName, width: up.width, height: up.height });
+    addLog('Color Pick matte captured', 'success');
+  }
+
+  function onSample(e: React.MouseEvent<HTMLImageElement>) {
+    if (!img) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    onChange(id, { pickColor: sampleColor(img, (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height) });
+  }
+
+  return (
+    <>
+      <LabelField id={id} label={data.label} onChange={onChange} placeholder="e.g. Head matte" />
+      {!connected ? (
+        <p className="cv-proc-hint">Connect an image to the input port.</p>
+      ) : (
+        <>
+          <div className="prop-section">
+            <label className="prop-section-label">Click to sample</label>
+            {img && <img className="cv-proc-sample" src={img.src} onClick={onSample} alt="source" />}
+          </div>
+          <div className="prop-section">
+            <label className="prop-section-label">Pick Color</label>
+            <input type="color" value={data.pickColor} onChange={(e) => onChange(id, { pickColor: e.target.value })} />
+          </div>
+          <div className="prop-section">
+            <label className="prop-section-label">Tolerance ({data.tolerance})</label>
+            <input type="range" min={0} max={200} value={data.tolerance} onChange={(e) => onChange(id, { tolerance: Number(e.target.value) })} />
+          </div>
+          {preview && (
+            <div className="prop-section">
+              <label className="prop-section-label">Matte Preview</label>
+              <img className="cv-proc-preview" src={preview} alt="matte preview" />
+            </div>
+          )}
+          <div className="prop-section">
+            <button className="generate-btn" onClick={capture}>📷 Capture Matte</button>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+function OverlayProperties({
+  id,
+  data,
+  onChange,
+}: {
+  id: string;
+  data: OverlayNodeData;
+  onChange: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  const { img: baseImg, connected: hasImage } = useSourceImage(id, 'image');
+  const { img: matteImg, connected: hasMatte } = useSourceImage(id, 'matte');
+  const [preview, setPreview] = useState('');
+
+  const opts = { color: data.color, opacity: data.opacity, invert: data.invert, expand: data.expand };
+  useEffect(() => {
+    if (!baseImg || !matteImg) {
+      setPreview('');
+      return;
+    }
+    const t = setTimeout(() => setPreview(processOverlay(baseImg, matteImg, opts).toDataURL('image/png')), 150);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseImg, matteImg, data.color, data.opacity, data.invert, data.expand]);
+
+  async function save() {
+    if (!baseImg || !matteImg) return;
+    const up = await uploadCanvas(processOverlay(baseImg, matteImg, opts), `overlay_${id}.png`);
+    onChange(id, { resultUrl: up.url, comfyName: up.comfyName, width: up.width, height: up.height });
+    addLog('Overlay result saved', 'success');
+  }
+
+  return (
+    <>
+      <LabelField id={id} label={data.label} onChange={onChange} placeholder="e.g. Tint head" />
+      {!hasImage || !hasMatte ? (
+        <p className="cv-proc-hint">Connect both an image and a matte to the input ports.</p>
+      ) : (
+        <>
+          <div className="prop-section">
+            <label className="prop-section-label">Color</label>
+            <input type="color" value={data.color} onChange={(e) => onChange(id, { color: e.target.value })} />
+          </div>
+          <div className="prop-section">
+            <label className="prop-section-label">Opacity ({data.opacity}%)</label>
+            <input type="range" min={0} max={100} value={data.opacity} onChange={(e) => onChange(id, { opacity: Number(e.target.value) })} />
+          </div>
+          <div className="prop-section">
+            <label className="prop-section-label" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input type="checkbox" checked={data.invert} onChange={(e) => onChange(id, { invert: e.target.checked })} /> Invert matte
+            </label>
+          </div>
+          <div className="prop-section">
+            <label className="prop-section-label">Expand ({data.expand}px)</label>
+            <input type="range" min={-20} max={20} value={data.expand} onChange={(e) => onChange(id, { expand: Number(e.target.value) })} />
+          </div>
+          {preview && (
+            <div className="prop-section">
+              <label className="prop-section-label">Preview</label>
+              <img className="cv-proc-preview" src={preview} alt="overlay preview" />
+            </div>
+          )}
+          <div className="prop-section">
+            <button className="generate-btn" onClick={save}>💾 Save Result</button>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+function LabelField({
+  id,
+  label,
+  onChange,
+  placeholder,
+}: {
+  id: string;
+  label: string;
+  onChange: (id: string, patch: Record<string, unknown>) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="prop-section">
+      <label className="prop-section-label">Label</label>
+      <input type="text" className="prop-input" value={label ?? ''} placeholder={placeholder} onChange={(e) => onChange(id, { label: e.target.value })} />
+    </div>
   );
 }
 

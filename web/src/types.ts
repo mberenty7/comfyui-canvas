@@ -105,10 +105,32 @@ export interface InpaintNodeData {
   [key: string]: unknown;
 }
 
+/** Common fields a processing node carries: its committed output image. */
+export interface ProcResultData {
+  label: string;
+  /** Committed output (after Capture/Save): a /uploads URL + ComfyUI name. */
+  resultUrl?: string | null;
+  comfyName?: string | null;
+  width?: number;
+  height?: number;
+}
+
+export interface ColorPickNodeData extends ProcResultData {
+  pickColor: string; // hex, e.g. "#3cb44b"
+  tolerance: number; // 0–200
+  [key: string]: unknown;
+}
+
+export interface OverlayNodeData extends ProcResultData {
+  color: string; // hex overlay tint
+  opacity: number; // 0–100
+  invert: boolean;
+  expand: number; // -20..20
+  [key: string]: unknown;
+}
+
 /** Output port "type" a node emits, used for connection validation. */
 export type PortType = 'image' | 'prompt' | 'workflow' | 'model';
-
-export type GenericNodeData = Record<string, unknown>;
 
 export type CanvasNode = Node;
 export type CanvasEdge = Edge;

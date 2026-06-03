@@ -17,6 +17,14 @@ export const MODEL_HANDLE = 'model';
 /** The image-input handle on an Inpaint node. */
 export const IMAGE_HANDLE = 'image';
 
+/** The named image input handles each processing node exposes. */
+export const PROC_INPUTS: Record<string, string[]> = {
+  colorpick: ['image'],
+  overlay: ['image', 'matte'],
+  grade: ['image', 'compare'],
+  paint: ['image'],
+};
+
 /**
  * The port types a node's output can satisfy. A model is polymorphic: it feeds
  * both a Viewer's model input and a Workflow's image input (camera captures).
@@ -31,6 +39,10 @@ export function sourceProvides(node: Node): PortType[] {
     case 'workflow':
       return ['workflow'];
     case 'inpaint':
+    case 'colorpick':
+    case 'overlay':
+    case 'grade':
+    case 'paint':
       return ['image'];
     case 'model':
       return ['image', 'model'];
@@ -49,6 +61,7 @@ export function inputType(node: Node, handleId: string | null | undefined): Port
   if (node.type === 'generate' && handleId === WORKFLOW_HANDLE) return 'workflow';
   if (node.type === 'viewer' && handleId === MODEL_HANDLE) return 'model';
   if (node.type === 'inpaint' && handleId === IMAGE_HANDLE) return 'image';
+  if (node.type && PROC_INPUTS[node.type]?.includes(handleId ?? '')) return 'image';
   return null;
 }
 

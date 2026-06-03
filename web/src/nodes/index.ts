@@ -6,6 +6,8 @@ import { GenerateNode } from './GenerateNode';
 import { ModelNode } from './ModelNode';
 import { ViewerNode } from './ViewerNode';
 import { InpaintNode } from './InpaintNode';
+import { ColorPickNode } from './ColorPickNode';
+import { OverlayNode } from './OverlayNode';
 
 /**
  * Registry of migrated node types. Types not listed here (tile-preview,
@@ -21,4 +23,6 @@ export const nodeTypes: NodeTypes = {
   model: ModelNode,
   viewer: ViewerNode,
   inpaint: InpaintNode,
+  colorpick: ColorPickNode,
+  overlay: OverlayNode,
 };
