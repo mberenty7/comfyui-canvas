@@ -39,6 +39,19 @@ export function Gallery() {
   const [lightbox, setLightbox] = useState(-1);
   const [meta, setMeta] = useState<Record<string, unknown> | null>(null);
 
+  // Default the custom-directory path to the configured Output Directory
+  // (where generations are copied) if the user hasn't set one yet.
+  useEffect(() => {
+    if (dirPath) return;
+    fetch('/api/config')
+      .then((r) => r.json())
+      .then((cfg: { outputDir?: string }) => {
+        if (cfg.outputDir) setDirPath(cfg.outputDir);
+      })
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const load = useCallback(async () => {
     setStatus('Loading…');
     setImages([]);
