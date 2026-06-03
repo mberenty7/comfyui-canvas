@@ -4,7 +4,7 @@ import { apiUpload } from './api';
 
 export type NodeKind =
   | 'prompt' | 'image' | 'workflow' | 'generate' | 'model' | 'viewer'
-  | 'inpaint' | 'colorpick' | 'overlay' | 'grade' | 'paint';
+  | 'inpaint' | 'colorpick' | 'overlay' | 'grade' | 'paint' | 'group';
 
 /** The node types offered in the Add-node menu and Tab quick-add. */
 export const NODE_KINDS: { type: NodeKind; label: string }[] = [
@@ -19,6 +19,7 @@ export const NODE_KINDS: { type: NodeKind; label: string }[] = [
   { type: 'model', label: '🎲 3D Model' },
   { type: 'viewer', label: '👁 3D Viewer' },
   { type: 'generate', label: '▶ Generate' },
+  { type: 'group', label: '📦 Group' },
 ];
 
 type Pos = { x: number; y: number };
@@ -144,6 +145,9 @@ export function createNodeAt(type: NodeKind, pos: Pos) {
       break;
     case 'paint':
       store.addNode('paint', { label: '', resultUrl: null, comfyName: null }, { x: pos.x - 80, y: pos.y - 40 });
+      break;
+    case 'group':
+      store.addNode('group', { label: 'Group' }, { x: pos.x - 70, y: pos.y - 30 });
       break;
     case 'workflow':
       useUI.getState().openWorkflowPicker(pos);

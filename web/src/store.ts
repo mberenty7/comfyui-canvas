@@ -19,6 +19,10 @@ interface CanvasState {
   zoom: number;
   viewport: { x: number; y: number };
   selectedId: string | null;
+  /** Current subgraph being viewed ('root' = top level). */
+  currentGroup: string;
+  /** Breadcrumb path from root to the current group. */
+  groupPath: { id: string; name: string }[];
   /** Transient per-Generate-node run status (not persisted). */
   genStatus: Record<string, GenStatus>;
 
@@ -30,6 +34,10 @@ interface CanvasState {
   // Selection + viewport tracking
   setSelected: (id: string | null) => void;
   setViewportState: (v: { x: number; y: number; zoom: number }) => void;
+
+  // Group navigation
+  enterGroup: (id: string, name: string) => void;
+  exitGroup: () => void;
 
   // Graph mutations
   nextId: () => string;
@@ -46,6 +54,9 @@ interface CanvasState {
   deserialize: (data: CanvasFileV2) => void;
 }
 
+/** The group a node/edge belongs to ('root' by default). */
+const groupOf = (n: { data?: Record<string, unknown> }): string => (n.data?.group as string) || 'root';
+
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: [],
   edges: [],
@@ -53,6 +64,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   zoom: 1,
   viewport: { x: 0, y: 0 },
   selectedId: null,
+  currentGroup: 'root',
+  groupPath: [{ id: 'root', name: 'Root' }],
   genStatus: {},
 
   onNodesChange: (changes) => {
@@ -68,12 +81,25 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     const edges = get().edges.filter(
       (e) => !(e.target === connection.target && e.targetHandle === connection.targetHandle),
     );
-    set({ edges: addEdge(connection, edges) });
+    // Tag the new edge with the current group so it's only shown there.
+    const tagged = { ...connection, data: { group: get().currentGroup } };
+    set({ edges: addEdge(tagged, edges) });
   },
 
   setSelected: (id) => set({ selectedId: id }),
 
   setViewportState: (v) => set({ viewport: { x: v.x, y: v.y }, zoom: v.zoom }),
+
+  enterGroup: (id, name) => {
+    set({ currentGroup: id, groupPath: [...get().groupPath, { id, name }], selectedId: null });
+  },
+
+  exitGroup: () => {
+    const path = get().groupPath;
+    if (path.length <= 1) return;
+    const next = path.slice(0, -1);
+    set({ groupPath: next, currentGroup: next[next.length - 1].id, selectedId: null });
+  },
 
   nextId: () => {
     const next = get().nodeIdCounter + 1;
@@ -83,7 +109,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   addNode: (type, data, position) => {
     const id = get().nextId();
-    const node: Node = { id, type, position, data };
+    // New nodes belong to the group currently being viewed.
+    const node: Node = { id, type, position, data: { ...data, group: get().currentGroup } };
     set({ nodes: [...get().nodes, node] });
     return id;
   },
@@ -97,10 +124,26 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   deleteNode: (id) => {
+    const nodes = get().nodes;
+    const target = nodes.find((n) => n.id === id);
+    // Deleting a group removes its whole subtree (nodes nested at any depth).
+    const doomed = new Set<string>([id]);
+    if (target?.type === 'group') {
+      let added = true;
+      while (added) {
+        added = false;
+        for (const n of nodes) {
+          if (!doomed.has(n.id) && doomed.has(groupOf(n))) {
+            doomed.add(n.id);
+            added = true;
+          }
+        }
+      }
+    }
     set({
-      nodes: get().nodes.filter((n) => n.id !== id),
-      edges: get().edges.filter((e) => e.source !== id && e.target !== id),
-      selectedId: get().selectedId === id ? null : get().selectedId,
+      nodes: nodes.filter((n) => !doomed.has(n.id)),
+      edges: get().edges.filter((e) => !doomed.has(e.source) && !doomed.has(e.target)),
+      selectedId: doomed.has(get().selectedId ?? '') ? null : get().selectedId,
     });
   },
 
@@ -128,7 +171,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   addResultEdge: (source, target) => {
-    set({ edges: [...get().edges, { id: `e_${source}_${target}_def`, source, sourceHandle: 'out', target, targetHandle: null }] });
+    set({
+      edges: [
+        ...get().edges,
+        { id: `e_${source}_${target}_def`, source, sourceHandle: 'out', target, targetHandle: null, data: { group: get().currentGroup } },
+      ],
+    });
   },
 
   setGenStatus: (id, status) => {
@@ -142,13 +190,18 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   deserialize: (data) => {
     const result = fromCanvasFormat(data);
+    // Derive each edge's group from its source node (both endpoints share one).
+    const groupById = new Map(result.nodes.map((n) => [n.id, groupOf(n)]));
+    const edges = result.edges.map((e) => ({ ...e, data: { ...e.data, group: groupById.get(e.source) || 'root' } }));
     set({
       nodes: result.nodes,
-      edges: result.edges,
+      edges,
       nodeIdCounter: result.nodeIdCounter,
       zoom: result.zoom,
       viewport: result.viewport,
       selectedId: null,
+      currentGroup: 'root',
+      groupPath: [{ id: 'root', name: 'Root' }],
     });
   },
 }));

@@ -98,7 +98,8 @@ export function PropertiesPanel() {
         {node.type === 'overlay' && <OverlayProperties id={node.id} data={node.data as OverlayNodeData} onChange={updateNodeData} />}
         {node.type === 'grade' && <GradeProperties id={node.id} data={node.data as GradeNodeData} onChange={updateNodeData} />}
         {node.type === 'paint' && <PaintProperties id={node.id} data={node.data as PaintNodeData} onChange={updateNodeData} />}
-        {!['prompt', 'image', 'workflow', 'generate', 'model', 'viewer', 'inpaint', 'colorpick', 'overlay', 'grade', 'paint'].includes(node.type ?? '') && (
+        {node.type === 'group' && <GroupProperties id={node.id} label={(node.data.label as string) || 'Group'} onChange={updateNodeData} />}
+        {!['prompt', 'image', 'workflow', 'generate', 'model', 'viewer', 'inpaint', 'colorpick', 'overlay', 'grade', 'paint', 'group'].includes(node.type ?? '') && (
           <div className="prop-section">
             <label className="prop-section-label">Type</label>
             <div className="prop-value">{node.type}</div>
@@ -953,6 +954,30 @@ function Slider({
       <label className="prop-section-label">{label} ({value})</label>
       <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(parseFloat(e.target.value))} />
     </div>
+  );
+}
+
+function GroupProperties({
+  id,
+  label,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  onChange: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  const count = useCanvasStore((s) => s.nodes.filter((n) => ((n.data?.group as string) || 'root') === id).length);
+  return (
+    <>
+      <div className="prop-section">
+        <label className="prop-section-label">Group Name</label>
+        <input type="text" className="prop-input" value={label} placeholder="Group" onChange={(e) => onChange(id, { label: e.target.value })} />
+      </div>
+      <PropRow label="Contents" value={`${count} node${count !== 1 ? 's' : ''}`} />
+      <div className="prop-section">
+        <button className="generate-btn" onClick={() => useCanvasStore.getState().enterGroup(id, label)}>Enter Group →</button>
+      </div>
+    </>
   );
 }
 

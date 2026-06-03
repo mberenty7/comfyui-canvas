@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -26,6 +26,7 @@ import { PaintModal } from './panels/PaintModal';
 import { Viewer3DModal } from './panels/Viewer3DModal';
 import { PromptLibrary } from './panels/PromptLibrary';
 import { Gallery } from './panels/Gallery';
+import { Breadcrumb } from './panels/Breadcrumb';
 import { useViewer3D } from './viewer3d';
 import { isValidConnection as checkConnection, MODEL_HANDLE } from './ports';
 import type { ModelNodeData } from './types';
@@ -36,8 +37,12 @@ const AUTOSAVE_KEY = 'comfyui-canvas-autosave';
 
 function Canvas() {
   const rf = useReactFlow();
-  const nodes = useCanvasStore((s) => s.nodes);
-  const edges = useCanvasStore((s) => s.edges);
+  const allNodes = useCanvasStore((s) => s.nodes);
+  const allEdges = useCanvasStore((s) => s.edges);
+  const currentGroup = useCanvasStore((s) => s.currentGroup);
+  // Only show the nodes/edges that belong to the group currently being viewed.
+  const nodes = useMemo(() => allNodes.filter((n) => ((n.data?.group as string) || 'root') === currentGroup), [allNodes, currentGroup]);
+  const edges = useMemo(() => allEdges.filter((e) => ((e.data?.group as string) || 'root') === currentGroup), [allEdges, currentGroup]);
   const onNodesChange = useCanvasStore((s) => s.onNodesChange);
   const onEdgesChange = useCanvasStore((s) => s.onEdgesChange);
   const onConnect = useCanvasStore((s) => s.onConnect);
@@ -83,14 +88,18 @@ function Canvas() {
     };
   }, []);
 
-  // Keyboard: Tab → quick-add, Ctrl/Cmd+D → duplicate selected.
+  // Keyboard: Tab → enter selected group else quick-add; Ctrl/Cmd+D → duplicate;
+  // Esc → close menus, else exit the current group.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const el = e.target as HTMLElement;
       if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return;
       if (e.key === 'Tab') {
         e.preventDefault();
-        useUI.getState().setQuickAddOpen(true);
+        const store = useCanvasStore.getState();
+        const sel = store.nodes.find((n) => n.id === store.selectedId);
+        if (sel?.type === 'group') store.enterGroup(sel.id, (sel.data.label as string) || 'Group');
+        else useUI.getState().setQuickAddOpen(true);
       } else if (e.key.toLowerCase() === 'd' && (e.ctrlKey || e.metaKey)) {
         const id = useCanvasStore.getState().selectedId;
         if (id) {
@@ -98,13 +107,24 @@ function Canvas() {
           useCanvasStore.getState().duplicateNode(id);
         }
       } else if (e.key === 'Escape') {
-        useUI.getState().setQuickAddOpen(false);
-        useUI.getState().closeContextMenu();
+        const ui = useUI.getState();
+        if (ui.quickAddOpen || ui.contextMenu) {
+          ui.setQuickAddOpen(false);
+          ui.closeContextMenu();
+        } else {
+          useCanvasStore.getState().exitGroup();
+        }
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  // Re-fit the view when navigating between groups.
+  useEffect(() => {
+    const t = setTimeout(() => rf.fitView({ duration: 200, maxZoom: 1.2 }), 30);
+    return () => clearTimeout(t);
+  }, [currentGroup, rf]);
 
   function onSelectionChange({ nodes: selectedNodes }: OnSelectionChangeParams) {
     setSelected(selectedNodes[0]?.id ?? null);
@@ -120,6 +140,10 @@ function Canvas() {
   }
 
   function onNodeDoubleClick(_: React.MouseEvent, node: RFNode) {
+    if (node.type === 'group') {
+      useCanvasStore.getState().enterGroup(node.id, (node.data.label as string) || 'Group');
+      return;
+    }
     if (node.type === 'model') {
       const d = node.data as ModelNodeData;
       if (d.modelUrl) useViewer3D.getState().openViewer(d.modelUrl, d.filename);
@@ -150,6 +174,7 @@ function Canvas() {
       }}
     >
       <Toolbar />
+      <Breadcrumb />
       <ReactFlow
         nodes={nodes}
         edges={edges}

@@ -10,6 +10,7 @@ import { ColorPickNode } from './ColorPickNode';
 import { OverlayNode } from './OverlayNode';
 import { GradeNode } from './GradeNode';
 import { PaintNode } from './PaintNode';
+import { GroupNode } from './GroupNode';
 
 /**
  * Registry of migrated node types. Types not listed here (tile-preview,
@@ -29,4 +30,5 @@ export const nodeTypes: NodeTypes = {
   overlay: OverlayNode,
   grade: GradeNode,
   paint: PaintNode,
+  group: GroupNode,
 };
