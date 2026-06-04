@@ -54,6 +54,8 @@ interface CanvasState {
   /** Serialize only the selected nodes (+ wires between them), or null if none selected. */
   serializeSelection: () => CanvasFileV2 | null;
   deserialize: (data: CanvasFileV2) => void;
+  /** Merge a saved file into the current group with fresh ids (selects the result). */
+  importGraph: (data: CanvasFileV2) => void;
 }
 
 /** The group a node/edge belongs to ('root' by default). */
@@ -201,6 +203,48 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       .filter((e) => ids.has(e.source) && ids.has(e.target))
       .map((e) => ({ ...e, data: { ...e.data, group: 'root' } }));
     return toCanvasFormat(subNodes, subEdges, { nodeIdCounter, zoom, viewport });
+  },
+
+  importGraph: (data) => {
+    const result = fromCanvasFormat(data);
+    if (result.nodes.length === 0) return;
+    const group = get().currentGroup;
+    const OFFSET = 40;
+
+    // Assign fresh ids so nothing collides with the existing graph.
+    let counter = get().nodeIdCounter;
+    const idMap = new Map<string, string>();
+    for (const n of result.nodes) idMap.set(n.id, `node_${++counter}`);
+
+    const newNodes = result.nodes.map((n) => {
+      const d = { ...n.data, group };
+      // Edges are the source of truth for connections; clear stale id references.
+      if ('connectedInputs' in d) d.connectedInputs = {};
+      if ('connectedWorkflow' in d) d.connectedWorkflow = null;
+      if ('connectedModel' in d) d.connectedModel = null;
+      if ('connectedImage' in d) d.connectedImage = null;
+      return {
+        ...n,
+        id: idMap.get(n.id)!,
+        position: { x: n.position.x + OFFSET, y: n.position.y + OFFSET },
+        data: d,
+        selected: true,
+      };
+    });
+
+    const newEdges = result.edges
+      .filter((e) => idMap.has(e.source) && idMap.has(e.target))
+      .map((e) => {
+        const source = idMap.get(e.source)!;
+        const target = idMap.get(e.target)!;
+        return { ...e, id: `e_${source}_${target}_${e.targetHandle ?? 'def'}`, source, target, data: { ...e.data, group } };
+      });
+
+    set({
+      nodes: [...get().nodes.map((n) => ({ ...n, selected: false })), ...newNodes],
+      edges: [...get().edges, ...newEdges],
+      nodeIdCounter: counter,
+    });
   },
 
   deserialize: (data) => {

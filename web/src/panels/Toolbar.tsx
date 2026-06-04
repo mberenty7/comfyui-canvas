@@ -36,11 +36,25 @@ export function Toolbar() {
     input.click();
   }
 
+  function importCanvas() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const data = JSON.parse(await file.text()) as CanvasFileV2;
+      useCanvasStore.getState().importGraph(data);
+    };
+    input.click();
+  }
+
   return (
     <div className="cv-toolbar">
       <AddNodeMenu />
       <button onClick={saveCanvas}>💾 Save</button>
       <button onClick={loadCanvas}>📂 Load</button>
+      <button onClick={importCanvas}>📥 Import</button>
       <button onClick={() => useUI.getState().togglePrompts()}>📝 Prompts</button>
       <button onClick={() => useUI.getState().toggleGallery()}>🖼️ Gallery</button>
       <button onClick={() => useLogStore.getState().toggle()}>📋 Log</button>
