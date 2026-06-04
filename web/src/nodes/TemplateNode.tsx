@@ -20,7 +20,7 @@ export function TemplateNode({ data, selected }: NodeProps) {
       {tags.map((tag, i) => {
         const top = PORT_TOP_START + i * PORT_SPACING;
         return (
-          <Handle key={tag} id={`tag_${tag}`} type="target" position={Position.Left} style={{ top }} className="cv-handle cv-handle-text" />
+          <Handle key={tag} id={`tag_${tag}`} type="target" position={Position.Left} style={{ top }} className="cv-handle cv-handle-prompt" />
         );
       })}
       {tags.map((tag, i) => (
