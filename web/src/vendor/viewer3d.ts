@@ -1,47 +1,82 @@
 // @ts-nocheck
-// Vendored from public/viewer-3d.js — three.js model viewer. Kept loose (no TS).
-// Viewer3D — embedded Three.js 3D model viewer modal
-// Supports GLB, GLTF, OBJ, FBX with shaders, depth/normal/color capture
-// Captures create ImageNodes on the canvas
-
+// Three.js model viewer with a Render Mode pipeline (Color / Depth / Normal /
+// Normal Gray / Puzzle Matte). Kept loose (no TS). Manages its own modal DOM.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 
+// 20-color palette for Puzzle Matte (one flat color per mesh) — matches Color Pick.
+const PALETTE = [
+  '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0',
+  '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8',
+  '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080',
+];
+
+// Capture resolutions (longest side 1024).
+const RES_OPTIONS = [
+  { id: '1:1', label: '1:1 (1024²)', w: 1024, h: 1024 },
+  { id: '16:9', label: '16:9', w: 1024, h: 576 },
+  { id: '9:16', label: '9:16', w: 576, h: 1024 },
+  { id: '4:3', label: '4:3', w: 1024, h: 768 },
+  { id: '3:4', label: '3:4', w: 768, h: 1024 },
+  { id: '3:2', label: '3:2', w: 1024, h: 683 },
+  { id: '2:3', label: '2:3', w: 683, h: 1024 },
+];
+
+// Focal length (mm, 35mm full-frame 24mm sensor height) → vertical FOV degrees.
+function focalToFov(mm) {
+  return (2 * Math.atan(24 / (2 * mm)) * 180) / Math.PI;
+}
+
 class Viewer3D {
   constructor() {
     this.modal = null;
-    this.minimized = false;
     this.renderer = null;
     this.scene = null;
     this.camera = null;
     this.controls = null;
     this.currentModel = null;
-    this.currentMaterial = null;
     this.clock = null;
     this.animId = null;
     this.grid = null;
+    this.modelCenter = new THREE.Vector3();
+    this.modelRadius = 1;
 
-    this.uniforms = {
-      uColor: { value: null },
-      uRimColor: { value: null },
-      uFresnelPower: { value: 2.0 },
-      uTime: { value: 0 },
-    };
+    // Settings
+    this.mode = 'color';
+    this.objectColor = '#b0b0b0';
+    this.focal = 36;
+    this.azimuth = -45;
+    this.elevation = 45;
+    this.bgColor = '#1a1a2e';
+    this.autoRotate = false;
+    this.showGrid = true;
+    this.currentRes = RES_OPTIONS[0];
 
-    this.shaderSources = { vertex: '', fragment: '' };
+    this._buildShaders();
     this._buildDOM();
   }
 
+  _buildShaders() {
+    this.depthMat = new THREE.ShaderMaterial({
+      uniforms: { uNear: { value: 0.1 }, uFar: { value: 10 } },
+      vertexShader: `varying float vZ; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); vZ = -mv.z; gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `varying float vZ; uniform float uNear; uniform float uFar; void main(){ float d = clamp((vZ - uNear)/(uFar - uNear), 0.0, 1.0); float v = 1.0 - d; gl_FragColor = vec4(vec3(v), 1.0); }`,
+    });
+    this.normalMat = new THREE.ShaderMaterial({
+      vertexShader: `varying vec3 vN; void main(){ vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      fragmentShader: `varying vec3 vN; void main(){ gl_FragColor = vec4(normalize(vN) * 0.5 + 0.5, 1.0); }`,
+    });
+  }
+
   _buildDOM() {
-    // Modal overlay
     const modal = document.createElement('div');
     modal.id = 'viewer3d-modal';
     modal.className = 'viewer3d-modal hidden';
     modal.innerHTML = `
-      <div class="viewer3d-container" id="viewer3d-container">
+      <div class="viewer3d-container">
         <div class="viewer3d-header">
           <span class="viewer3d-title">🎲 3D Viewer</span>
           <div class="viewer3d-header-actions">
@@ -56,54 +91,53 @@ class Viewer3D {
           </div>
           <div class="viewer3d-sidebar">
             <section>
-              <h4>Model</h4>
-              <div id="viewer3d-model-info" class="viewer3d-info">No model loaded</div>
-              <div id="viewer3d-error" style="color:#ff4444;font-size:11px;font-family:monospace;white-space:pre-wrap;max-height:150px;overflow-y:auto"></div>
-            </section>
-
-            <section>
-              <h4>Shader</h4>
-              <select id="viewer3d-shader-select">
-                <option value="fresnel">Fresnel</option>
-                <option value="toon">Toon</option>
-                <option value="holographic">Holographic</option>
+              <h4>Render Mode</h4>
+              <select id="v3d-mode">
+                <option value="color">Color</option>
+                <option value="depth">Depth</option>
+                <option value="normal">Normal</option>
+                <option value="normalgray">Normal (Gray)</option>
+                <option value="puzzle">Puzzle Matte</option>
               </select>
-              <div class="viewer3d-controls">
-                <label>Base Color <input type="color" id="viewer3d-color" value="#808080"></label>
-                <label>Fresnel Power <input type="range" id="viewer3d-fresnel" min="0.5" max="5" step="0.1" value="2.0"></label>
-                <label>Rim Color <input type="color" id="viewer3d-rim" value="#ffffff"></label>
+              <div class="viewer3d-controls" id="v3d-objcolor-row">
+                <label>Object Color <input type="color" id="v3d-objcolor" value="#b0b0b0"></label>
+              </div>
+              <div class="viewer3d-controls" id="v3d-light-row" style="display:none">
+                <label>Azimuth <input type="range" id="v3d-az" min="-180" max="180" value="-45"></label>
+                <label>Elevation <input type="range" id="v3d-el" min="-90" max="90" value="45"></label>
               </div>
             </section>
 
             <section>
-              <h4>Scene</h4>
-              <label>Background <input type="color" id="viewer3d-bg" value="#1a1a2e"></label>
-              <label>Auto-Rotate <input type="checkbox" id="viewer3d-rotate"></label>
-              <label>Show Grid <input type="checkbox" id="viewer3d-grid"></label>
+              <h4>Capture → Canvas</h4>
+              <label>Resolution
+                <select id="v3d-res">${RES_OPTIONS.map((r) => `<option value="${r.id}">${r.label}</option>`).join('')}</select>
+              </label>
+              <label>Focal Length <span id="v3d-focal-val">36mm</span>
+                <input type="range" id="v3d-focal" min="10" max="200" step="1" value="36">
+              </label>
+              <button class="viewer3d-capture-btn" id="v3d-capture">📷 Capture</button>
             </section>
 
             <section>
-              <h4>Capture → Canvas</h4>
-              <select id="viewer3d-capture-res">
-                <option value="1024">1024×1024</option>
-                <option value="896">896×1152</option>
-                <option value="512">512×512</option>
-                <option value="2048">2048×2048</option>
-              </select>
-              <button class="viewer3d-capture-btn" data-mode="depth">📷 Depth Map</button>
-              <button class="viewer3d-capture-btn" data-mode="depth4">📷 Depth 4-View</button>
-              <button class="viewer3d-capture-btn" data-mode="normal">📷 Normal Map</button>
-              <button class="viewer3d-capture-btn" data-mode="color">📷 Color Render</button>
+              <h4>Scene</h4>
+              <label>Background <input type="color" id="v3d-bg" value="#1a1a2e"></label>
+              <label>Auto-Rotate <input type="checkbox" id="v3d-rotate"></label>
+              <label>Show Grid <input type="checkbox" id="v3d-grid" checked></label>
+            </section>
+
+            <section>
+              <h4>Model</h4>
+              <div id="v3d-info" class="viewer3d-info">No model loaded</div>
+              <div id="v3d-error" style="color:#ff4444;font-size:11px;font-family:monospace;white-space:pre-wrap;max-height:140px;overflow-y:auto"></div>
             </section>
           </div>
         </div>
       </div>
     `;
-
     document.body.appendChild(modal);
     this.modal = modal;
 
-    // Minimized pill
     const pill = document.createElement('div');
     pill.id = 'viewer3d-pill';
     pill.className = 'viewer3d-pill hidden';
@@ -112,249 +146,250 @@ class Viewer3D {
     document.body.appendChild(pill);
     this.pill = pill;
 
-    // Events
-    document.getElementById('viewer3d-close').addEventListener('click', () => this.close());
-    document.getElementById('viewer3d-minimize').addEventListener('click', () => this.minimize());
+    const $ = (id) => document.getElementById(id);
+    $('viewer3d-close').addEventListener('click', () => this.close());
+    $('viewer3d-minimize').addEventListener('click', () => this.minimize());
 
-    document.getElementById('viewer3d-shader-select').addEventListener('change', (e) => {
-      this._loadShaderPreset(e.target.value);
+    $('v3d-mode').addEventListener('change', (e) => {
+      this.mode = e.target.value;
+      $('v3d-objcolor-row').style.display = this.mode === 'color' ? '' : 'none';
+      $('v3d-light-row').style.display = this.mode === 'normalgray' ? '' : 'none';
+      this._applyMode();
     });
+    $('v3d-objcolor').addEventListener('input', (e) => {
+      this.objectColor = e.target.value;
+      if (this.mode === 'color') this._applyMode();
+    });
+    $('v3d-az').addEventListener('input', (e) => {
+      this.azimuth = parseFloat(e.target.value);
+      this._updateGrayLight();
+    });
+    $('v3d-el').addEventListener('input', (e) => {
+      this.elevation = parseFloat(e.target.value);
+      this._updateGrayLight();
+    });
+    $('v3d-res').addEventListener('change', (e) => {
+      this.currentRes = RES_OPTIONS.find((r) => r.id === e.target.value) || RES_OPTIONS[0];
+    });
+    $('v3d-focal').addEventListener('input', (e) => {
+      this.focal = parseFloat(e.target.value);
+      $('v3d-focal-val').textContent = `${this.focal}mm`;
+      this._applyFocal();
+    });
+    $('v3d-bg').addEventListener('input', (e) => {
+      this.bgColor = e.target.value;
+      if (this.scene && (this.mode === 'color' || this.mode === 'normalgray')) this.scene.background = new THREE.Color(this.bgColor);
+    });
+    $('v3d-rotate').addEventListener('change', (e) => {
+      this.autoRotate = e.target.checked;
+      if (this.controls) this.controls.autoRotate = this.autoRotate;
+    });
+    $('v3d-grid').addEventListener('change', (e) => {
+      this.showGrid = e.target.checked;
+      if (this.grid) this.grid.visible = this.showGrid && this.mode === 'color';
+    });
+    $('v3d-capture').addEventListener('click', () => this._capture());
 
-    document.getElementById('viewer3d-color').addEventListener('input', (e) => {
-      this.uniforms.uColor.value.set(e.target.value);
-    });
-    document.getElementById('viewer3d-rim').addEventListener('input', (e) => {
-      this.uniforms.uRimColor.value.set(e.target.value);
-    });
-    document.getElementById('viewer3d-fresnel').addEventListener('input', (e) => {
-      this.uniforms.uFresnelPower.value = parseFloat(e.target.value);
-    });
-    document.getElementById('viewer3d-bg').addEventListener('input', (e) => {
-      this.scene?.background?.set(e.target.value);
-    });
-    document.getElementById('viewer3d-rotate').addEventListener('change', (e) => {
-      if (this.controls) this.controls.autoRotate = e.target.checked;
-    });
-    document.getElementById('viewer3d-grid').addEventListener('change', (e) => {
-      if (this.grid) this.grid.visible = e.target.checked;
-    });
-
-    // Capture buttons
-    document.querySelectorAll('.viewer3d-capture-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const mode = btn.dataset.mode;
-        if (mode === 'depth4') this._captureDepth4View();
-        else this._captureRender(mode);
-      });
-    });
-
-    // Drag & drop on viewport
-    const viewport = document.getElementById('viewer3d-viewport');
+    const viewport = $('viewer3d-viewport');
     viewport.addEventListener('dragover', (e) => {
       e.preventDefault();
-      e.stopPropagation();
-      document.getElementById('viewer3d-dropzone').classList.add('active');
+      $('viewer3d-dropzone').classList.add('active');
     });
     viewport.addEventListener('dragleave', (e) => {
-      if (!viewport.contains(e.relatedTarget)) {
-        document.getElementById('viewer3d-dropzone').classList.remove('active');
-      }
+      if (!viewport.contains(e.relatedTarget)) $('viewer3d-dropzone').classList.remove('active');
     });
     viewport.addEventListener('drop', (e) => {
       e.preventDefault();
-      e.stopPropagation();
-      document.getElementById('viewer3d-dropzone').classList.remove('active');
+      $('viewer3d-dropzone').classList.remove('active');
       const file = e.dataTransfer.files[0];
       if (file && /\.(glb|gltf|obj|fbx)$/i.test(file.name)) {
-        const url = URL.createObjectURL(file);
-        this._loadModel(url);
-        document.getElementById('viewer3d-model-info').textContent = file.name;
+        this._loadModel(URL.createObjectURL(file));
+        $('v3d-info').textContent = file.name;
       }
     });
   }
 
   _destroyThree() {
-    if (this.animId) {
-      cancelAnimationFrame(this.animId);
-      this.animId = null;
-    }
-    // Dispose current model
-    if (this.currentModel && this.scene) {
-      this.scene.remove(this.currentModel);
-      this.currentModel.traverse(c => {
-        if (c.geometry) c.geometry.dispose();
-        if (c.material) {
-          if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
-          else c.material.dispose();
-        }
-      });
-      this.currentModel = null;
-    }
-    if (this.currentMaterial) {
-      this.currentMaterial.dispose();
-      this.currentMaterial = null;
-    }
-    if (this.controls) {
-      this.controls.dispose();
-      this.controls = null;
-    }
-    if (this.renderer) {
-      this.renderer.dispose();
-      this.renderer.forceContextLoss();
-      this.renderer = null;
-    }
+    if (this.animId) cancelAnimationFrame(this.animId);
+    this.animId = null;
+    if (this.controls) { this.controls.dispose(); this.controls = null; }
+    if (this.renderer) { this.renderer.dispose(); this.renderer.forceContextLoss(); this.renderer = null; }
     this.scene = null;
     this.camera = null;
     this.grid = null;
-    this.clock = null;
+    this.currentModel = null;
   }
 
   _initThree() {
-    // Always start fresh
     this._destroyThree();
+    const old = document.getElementById('viewer3d-canvas');
+    const canvas = document.createElement('canvas');
+    canvas.id = 'viewer3d-canvas';
+    old.parentNode.replaceChild(canvas, old);
 
-    // Replace canvas element (old one's WebGL context is dead after forceContextLoss)
-    const oldCanvas = document.getElementById('viewer3d-canvas');
-    const newCanvas = document.createElement('canvas');
-    newCanvas.id = 'viewer3d-canvas';
-    oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
-
-    const canvas = newCanvas;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x1a1a2e);
+    this.scene.background = new THREE.Color(this.bgColor);
 
-    this.camera = new THREE.PerspectiveCamera(50, 1, 0.01, 100);
+    this.camera = new THREE.PerspectiveCamera(focalToFov(this.focal), 1, 0.01, 1000);
     this.camera.position.set(0, 1, 3);
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
     this.controls.target.set(0, 0.5, 0);
+    this.controls.autoRotate = this.autoRotate;
 
-    // Lighting
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-    const dir = new THREE.DirectionalLight(0xffffff, 1.0);
-    dir.position.set(3, 5, 4);
-    this.scene.add(dir);
-    const fill = new THREE.DirectionalLight(0x8888ff, 0.3);
-    fill.position.set(-3, 2, -2);
-    this.scene.add(fill);
+    // Beauty lighting (4-light setup) — used in Color mode.
+    this.ambient = new THREE.AmbientLight(0xffffff, 0.3);
+    this.scene.add(this.ambient);
+    this.beautyLights = [];
+    const beautySpecs = [
+      [0xffffff, 1.1, [4, 6, 5]],
+      [0xbcccff, 0.5, [-5, 2, 3]],
+      [0xffffff, 0.6, [0, 4, -6]],
+      [0xffe6c0, 0.4, [3, -2, 2]],
+    ];
+    for (const [color, intensity, pos] of beautySpecs) {
+      const l = new THREE.DirectionalLight(color, intensity);
+      l.position.set(...pos);
+      this.scene.add(l);
+      this.beautyLights.push(l);
+    }
+    // Single light for Normal (Gray) mode.
+    this.grayLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    this.scene.add(this.grayLight);
+    this._updateGrayLight();
 
     this.grid = new THREE.GridHelper(4, 20, 0x333355, 0x222244);
-    this.grid.visible = false;
     this.scene.add(this.grid);
 
     this.clock = new THREE.Clock();
-
-    this.uniforms.uColor.value = new THREE.Color(0x808080);
-    this.uniforms.uRimColor.value = new THREE.Color(0xffffff);
-
     this._resize();
     this._animate();
   }
 
+  _updateGrayLight() {
+    if (!this.grayLight) return;
+    const az = (this.azimuth * Math.PI) / 180;
+    const el = (this.elevation * Math.PI) / 180;
+    const d = 8;
+    this.grayLight.position.set(d * Math.cos(el) * Math.sin(az), d * Math.sin(el), d * Math.cos(el) * Math.cos(az));
+    this.grayLight.target.position.set(0, 0.5, 0);
+    this.grayLight.target.updateMatrixWorld();
+  }
+
+  _applyFocal() {
+    if (!this.camera) return;
+    this.camera.fov = focalToFov(this.focal);
+    this.camera.updateProjectionMatrix();
+  }
+
+  _bgForMode() {
+    if (this.mode === 'depth' || this.mode === 'puzzle') return '#000000';
+    if (this.mode === 'normal') return '#3a4a8a';
+    return this.bgColor;
+  }
+
+  _meshes() {
+    const out = [];
+    if (this.currentModel) this.currentModel.traverse((c) => { if (c.isMesh || c.isSkinnedMesh) out.push(c); });
+    return out;
+  }
+
+  _applyMode() {
+    if (!this.renderer) return;
+    const meshes = this._meshes();
+
+    if (this.mode === 'color') {
+      const m = new THREE.MeshStandardMaterial({ color: new THREE.Color(this.objectColor), metalness: 0.1, roughness: 0.7 });
+      meshes.forEach((x) => (x.material = m));
+      this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    } else if (this.mode === 'depth') {
+      meshes.forEach((x) => (x.material = this.depthMat));
+      this.renderer.toneMapping = THREE.NoToneMapping;
+    } else if (this.mode === 'normal') {
+      meshes.forEach((x) => (x.material = this.normalMat));
+      this.renderer.toneMapping = THREE.NoToneMapping;
+    } else if (this.mode === 'normalgray') {
+      const m = new THREE.MeshLambertMaterial({ color: 0xffffff });
+      meshes.forEach((x) => (x.material = m));
+      this.renderer.toneMapping = THREE.NoToneMapping;
+    } else if (this.mode === 'puzzle') {
+      meshes.forEach((x, i) => (x.material = new THREE.MeshBasicMaterial({ color: new THREE.Color(PALETTE[i % PALETTE.length]) })));
+      this.renderer.toneMapping = THREE.NoToneMapping;
+    }
+
+    // Lights: beauty for color; single light for normalgray; off otherwise.
+    this.ambient.intensity = this.mode === 'color' ? 0.3 : this.mode === 'normalgray' ? 0.15 : 0;
+    this.beautyLights.forEach((l) => (l.visible = this.mode === 'color'));
+    this.grayLight.visible = this.mode === 'normalgray';
+
+    this.scene.background = new THREE.Color(this._bgForMode());
+    this.grid.visible = this.showGrid && this.mode === 'color';
+    meshes.forEach((x) => x.material && (x.material.needsUpdate = true));
+  }
+
   _resize() {
     if (!this.renderer) return;
-    const viewport = document.getElementById('viewer3d-viewport');
-    if (!viewport) return;
-    const w = viewport.clientWidth;
-    const h = viewport.clientHeight;
+    const vp = document.getElementById('viewer3d-viewport');
+    if (!vp) return;
+    const w = vp.clientWidth;
+    const h = vp.clientHeight;
     this.renderer.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
 
+  _updateDepthUniforms(cam) {
+    const dist = cam.position.distanceTo(this.modelCenter);
+    this.depthMat.uniforms.uNear.value = Math.max(0.001, dist - this.modelRadius);
+    this.depthMat.uniforms.uFar.value = dist + this.modelRadius;
+  }
+
   _animate() {
     this.animId = requestAnimationFrame(() => this._animate());
-    this.uniforms.uTime.value = this.clock.getElapsedTime();
     this.controls.update();
+    if (this.mode === 'depth') this._updateDepthUniforms(this.camera);
     this.renderer.render(this.scene, this.camera);
   }
 
-  async _loadShaderPreset(name) {
-    try {
-      const res = await fetch(`/shaders/${name}.vert`);
-      const vert = await res.text();
-      const res2 = await fetch(`/shaders/${name}.frag`);
-      const frag = await res2.text();
-      this.shaderSources = { vertex: vert, fragment: frag };
-      this._applyShader();
-    } catch (err) {
-      console.error('Failed to load shader:', err);
-    }
-  }
-
-  _applyShader() {
-    
-    const { vertex, fragment } = this.shaderSources;
-    if (!vertex || !fragment || !this.currentModel) return;
-
-    try {
-      let needsSkinning = false;
-      this.currentModel.traverse(child => {
-        if (child.isSkinnedMesh) needsSkinning = true;
-      });
-
-      const mat = new THREE.ShaderMaterial({
-        vertexShader: vertex,
-        fragmentShader: fragment,
-        uniforms: this.uniforms,
-        transparent: true,
-      });
-
-      this.currentModel.traverse(child => {
-        if (child.isMesh || child.isSkinnedMesh) child.material = mat;
-      });
-
-      if (this.currentMaterial) this.currentMaterial.dispose();
-      this.currentMaterial = mat;
-    } catch (err) {
-      console.error('Shader error:', err);
-    }
-  }
-
   _loadModel(url) {
-    
-
     if (this.currentModel) {
       this.scene.remove(this.currentModel);
-      this.currentModel.traverse(c => {
+      this.currentModel.traverse((c) => {
         if (c.geometry) c.geometry.dispose();
-        if (c.material) {
-          if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
-          else c.material.dispose();
-        }
+        if (c.material) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m) => m.dispose());
       });
     }
-
-    document.getElementById('viewer3d-model-info').textContent = 'Loading...';
+    document.getElementById('v3d-info').textContent = 'Loading...';
     const ext = url.split('.').pop().split('?')[0].toLowerCase();
 
     const onLoaded = (object) => {
       this.currentModel = object.scene || object;
-
-      // Auto-scale and center
       const box = new THREE.Box3().setFromObject(this.currentModel);
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
       const scale = 2 / maxDim;
       this.currentModel.scale.setScalar(scale);
       this.currentModel.position.sub(center.multiplyScalar(scale));
-
       this.scene.add(this.currentModel);
-      this._applyShader();
 
-      const info = `${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)}`;
-      document.getElementById('viewer3d-model-info').textContent = info;
+      const fitBox = new THREE.Box3().setFromObject(this.currentModel);
+      this.modelCenter = fitBox.getCenter(new THREE.Vector3());
+      this.modelRadius = fitBox.getSize(new THREE.Vector3()).length() / 2 || 1;
+
+      this._applyMode();
+      document.getElementById('v3d-info').textContent = `${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)}`;
     };
-
     const onError = (err) => {
-      document.getElementById('viewer3d-model-info').textContent = 'Failed to load';
+      document.getElementById('v3d-info').textContent = 'Failed to load';
       this._showError('Model load: ' + (err.message || err));
     };
 
@@ -363,221 +398,77 @@ class Viewer3D {
     else new GLTFLoader().load(url, onLoaded, undefined, onError);
   }
 
-  // ── Capture → ImageNode ────────────────────
-
-  _getCaptureRes() {
-    const val = document.getElementById('viewer3d-capture-res').value;
-    if (val === '896') return { w: 896, h: 1152 };
-    const s = parseInt(val);
-    return { w: s, h: s };
-  }
-
-  async _captureRender(mode) {
+  async _capture() {
     if (!this.currentModel) return;
+    const { w, h } = this.currentRes;
+    const off = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    off.setPixelRatio(1);
+    off.setSize(w, h);
+    off.outputColorSpace = THREE.SRGBColorSpace;
+    off.toneMapping = this.mode === 'color' ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
+    off.toneMappingExposure = 1.0;
 
-    
-    const { w, h } = this._getCaptureRes();
+    const cam = this.camera.clone();
+    cam.aspect = w / h;
+    cam.updateProjectionMatrix();
+    if (this.mode === 'depth') this._updateDepthUniforms(cam);
 
-    const offRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-    offRenderer.setSize(w, h);
-    offRenderer.outputColorSpace = THREE.SRGBColorSpace;
-
-    const offCamera = this.camera.clone();
-    offCamera.aspect = w / h;
-    offCamera.updateProjectionMatrix();
-
-    const savedMaterials = new Map();
-    const savedBg = this.scene.background.clone();
     const gridWas = this.grid.visible;
     this.grid.visible = false;
-
-    if (mode === 'depth') {
-      const box = new THREE.Box3().setFromObject(this.currentModel);
-      const corners = this._boxCorners(box);
-      let nearZ = Infinity, farZ = -Infinity;
-      for (const c of corners) {
-        const z = -c.clone().applyMatrix4(offCamera.matrixWorldInverse).z;
-        if (z < nearZ) nearZ = z;
-        if (z > farZ) farZ = z;
-      }
-      const pad = (farZ - nearZ) * 0.02;
-      offCamera.near = Math.max(0.001, nearZ - pad);
-      offCamera.far = farZ + pad;
-      offCamera.updateProjectionMatrix();
-
-      this.scene.background = new THREE.Color(0x000000);
-      this.currentModel.traverse(child => {
-        if (child.isMesh || child.isSkinnedMesh) {
-          savedMaterials.set(child, child.material);
-          child.material = new THREE.MeshDepthMaterial({ depthPacking: THREE.BasicDepthPacking });
-        }
-      });
-    } else if (mode === 'normal') {
-      this.scene.background = new THREE.Color(0x8080ff);
-      this.currentModel.traverse(child => {
-        if (child.isMesh || child.isSkinnedMesh) {
-          savedMaterials.set(child, child.material);
-          child.material = new THREE.MeshNormalMaterial();
-        }
-      });
-    } else {
-      this.scene.background = new THREE.Color(0xffffff);
-    }
-
-    offRenderer.render(this.scene, offCamera);
-    const dataURL = offRenderer.domElement.toDataURL('image/png');
-
-    // Restore
-    this.scene.background = savedBg;
-    savedMaterials.forEach((mat, child) => { child.material = mat; });
+    off.render(this.scene, cam);
+    const dataURL = off.domElement.toDataURL('image/png');
     this.grid.visible = gridWas;
-    offRenderer.dispose();
+    off.dispose();
+    off.forceContextLoss();
 
-    // Create ImageNode on canvas
-    await this._placeCapture(dataURL, `${mode}_${w}x${h}.png`, mode);
-  }
-
-  async _captureDepth4View() {
-    if (!this.currentModel) return;
-
-    
-    const { w, h } = this._getCaptureRes();
-
-    const offRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-    offRenderer.setSize(w, h);
-    offRenderer.outputColorSpace = THREE.SRGBColorSpace;
-
-    const box = new THREE.Box3().setFromObject(this.currentModel);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    const dist = Math.max(size.x, size.y, size.z) * 1.8;
-
-    const savedBg = this.scene.background.clone();
-    const savedMaterials = new Map();
-    const gridWas = this.grid.visible;
-    this.grid.visible = false;
-
-    this.scene.background = new THREE.Color(0x000000);
-    this.currentModel.traverse(child => {
-      if (child.isMesh || child.isSkinnedMesh) {
-        savedMaterials.set(child, child.material);
-        child.material = new THREE.MeshDepthMaterial({ depthPacking: THREE.BasicDepthPacking });
-      }
-    });
-
-    const views = [
-      { name: 'front', dir: new THREE.Vector3(0, 0, 1) },
-      { name: 'back', dir: new THREE.Vector3(0, 0, -1) },
-      { name: 'left', dir: new THREE.Vector3(-1, 0, 0) },
-      { name: 'right', dir: new THREE.Vector3(1, 0, 0) },
-    ];
-
-    const offCamera = new THREE.PerspectiveCamera(50, w / h, 0.001, 100);
-    const corners = this._boxCorners(box);
-
-    for (const view of views) {
-      const pos = center.clone().add(view.dir.clone().multiplyScalar(dist));
-      offCamera.position.copy(pos);
-      offCamera.lookAt(center);
-      offCamera.updateMatrixWorld();
-
-      let nearZ = Infinity, farZ = -Infinity;
-      for (const c of corners) {
-        const z = -c.clone().applyMatrix4(offCamera.matrixWorldInverse).z;
-        if (z < nearZ) nearZ = z;
-        if (z > farZ) farZ = z;
-      }
-      const pad = (farZ - nearZ) * 0.02;
-      offCamera.near = Math.max(0.001, nearZ - pad);
-      offCamera.far = farZ + pad;
-      offCamera.updateProjectionMatrix();
-
-      offRenderer.render(this.scene, offCamera);
-      const dataURL = offRenderer.domElement.toDataURL('image/png');
-      await this._placeCapture(dataURL, `depth_${view.name}_${w}x${h}.png`, `depth-${view.name}`);
-    }
-
-    // Restore
-    this.scene.background = savedBg;
-    savedMaterials.forEach((mat, child) => { child.material = mat; });
-    this.grid.visible = gridWas;
-    offRenderer.dispose();
-  }
-
-  _boxCorners(box) {
-    
-    return [
-      new THREE.Vector3(box.min.x, box.min.y, box.min.z),
-      new THREE.Vector3(box.min.x, box.min.y, box.max.z),
-      new THREE.Vector3(box.min.x, box.max.y, box.min.z),
-      new THREE.Vector3(box.min.x, box.max.y, box.max.z),
-      new THREE.Vector3(box.max.x, box.min.y, box.min.z),
-      new THREE.Vector3(box.max.x, box.min.y, box.max.z),
-      new THREE.Vector3(box.max.x, box.max.y, box.min.z),
-      new THREE.Vector3(box.max.x, box.max.y, box.max.z),
-    ];
+    await this._placeCapture(dataURL, `${this.mode}_${w}x${h}.png`, this.mode);
   }
 
   async _placeCapture(dataURL, filename, label) {
-    // Upload the captured image to the server
     const blob = await (await fetch(dataURL)).blob();
     const formData = new FormData();
     formData.append('image', blob, filename);
-
     const resp = await fetch('/api/comfy/upload', { method: 'POST', body: formData });
     const raw = await resp.json();
     // /api/comfy/upload wraps its payload as { ok, data }.
-    const result = (raw && typeof raw === 'object' && 'ok' in raw) ? (raw.data || {}) : raw;
+    const result = raw && typeof raw === 'object' && 'ok' in raw ? raw.data || {} : raw;
 
-    // Parse dimensions from the dataURL
-    const dims = await new Promise(resolve => {
+    const dims = await new Promise((resolve) => {
       const img = new Image();
       img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
       img.src = dataURL;
     });
 
-    // Create ImageNode on canvas
     if (captureHandler) {
       captureHandler({
         imageUrl: result.localPath,
-        filename: filename,
+        filename,
         comfyName: result.comfyName,
         width: dims.width,
         height: dims.height,
         format: 'PNG',
-        label: label,
+        label,
       });
     }
   }
 
   _showError(msg) {
-    const el = document.getElementById('viewer3d-error');
+    const el = document.getElementById('v3d-error');
     if (el) el.textContent = msg;
   }
-
-  // ── Open / Close / Minimize ────────────────
 
   async open(modelUrl, filename) {
     this.modal.classList.remove('hidden');
     this.pill.classList.add('hidden');
-    this.minimized = false;
-
-    // Clear any previous error
-    const errEl = document.getElementById('viewer3d-error');
+    const errEl = document.getElementById('v3d-error');
     if (errEl) errEl.textContent = '';
-
     try {
       this._initThree();
-
-      // Need to resize after modal is visible
       requestAnimationFrame(() => {
         this._resize();
-        // Always reload shaders on fresh init
-        this.shaderSources = { vertex: '', fragment: '' };
-        this._loadShaderPreset('fresnel');
         if (modelUrl) {
           this._loadModel(modelUrl);
-          document.getElementById('viewer3d-model-info').textContent = filename || 'Model';
+          document.getElementById('v3d-info').textContent = filename || 'Model';
         }
       });
     } catch (err) {
@@ -585,33 +476,33 @@ class Viewer3D {
     }
   }
 
-
   close() {
     this.modal.classList.add('hidden');
     this.pill.classList.add('hidden');
-    this.minimized = false;
     this._destroyThree();
-    // Clear error display
-    const errEl = document.getElementById('viewer3d-error');
+    const errEl = document.getElementById('v3d-error');
     if (errEl) errEl.textContent = '';
   }
 
   minimize() {
     this.modal.classList.add('hidden');
     this.pill.classList.remove('hidden');
-    this.minimized = true;
   }
 
   restore() {
     this.modal.classList.remove('hidden');
     this.pill.classList.add('hidden');
-    this.minimized = false;
     requestAnimationFrame(() => this._resize());
-    if (!this.animId) this._animate();
+    if (!this.animId && this.renderer) this._animate();
   }
 }
 
 let _instance = null;
-export function getViewer3D() { if (!_instance) _instance = new Viewer3D(); return _instance; }
+export function getViewer3D() {
+  if (!_instance) _instance = new Viewer3D();
+  return _instance;
+}
 export let captureHandler = null;
-export function setCaptureHandler(fn) { captureHandler = fn; }
+export function setCaptureHandler(fn) {
+  captureHandler = fn;
+}
