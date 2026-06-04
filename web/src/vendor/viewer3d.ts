@@ -433,6 +433,17 @@ class Viewer3D {
     // /api/comfy/upload wraps its payload as { ok, data }.
     const result = raw && typeof raw === 'object' && 'ok' in raw ? raw.data || {} : raw;
 
+    // Best-effort copy to the configured output directory.
+    try {
+      const outForm = new FormData();
+      outForm.append('image', blob, filename);
+      outForm.append('filename', filename);
+      outForm.append('metadata', JSON.stringify({ timestamp: new Date().toISOString(), source: '3d-viewer', mode: label }));
+      fetch('/api/save-image-file', { method: 'POST', body: outForm });
+    } catch (e) {
+      /* output dir not set — non-fatal */
+    }
+
     const dims = await new Promise((resolve) => {
       const img = new Image();
       img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });

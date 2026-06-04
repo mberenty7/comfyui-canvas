@@ -168,12 +168,27 @@ export function processGrade(img: HTMLImageElement, p: GradeParams): HTMLCanvasE
   return canvas;
 }
 
+/** Best-effort copy of a produced image to the configured output directory. */
+export async function saveToOutputDir(blob: Blob, filename: string, metadata?: Record<string, unknown>) {
+  try {
+    const form = new FormData();
+    form.append('image', new File([blob], filename, { type: 'image/png' }));
+    form.append('filename', filename);
+    form.append('metadata', JSON.stringify(metadata ?? { timestamp: new Date().toISOString() }));
+    await fetch('/api/save-image-file', { method: 'POST', body: form });
+  } catch {
+    /* output dir not set or unreachable — non-fatal */
+  }
+}
+
 /** Upload a canvas as a PNG to ComfyUI and return its URL + comfyName. */
-export async function uploadCanvas(canvas: HTMLCanvasElement, filename: string) {
+export async function uploadCanvas(canvas: HTMLCanvasElement, filename: string, metadata?: Record<string, unknown>) {
   const blob: Blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b!), 'image/png'));
   const form = new FormData();
   form.append('image', new File([blob], filename, { type: 'image/png' }));
   const result = await apiUpload<{ localPath?: string; path?: string; comfyName?: string }>('/api/comfy/upload', form);
+  // Also copy to the output directory (best-effort).
+  saveToOutputDir(blob, filename, metadata);
   return {
     url: result.localPath || result.path || '',
     comfyName: result.comfyName || filename,

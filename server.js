@@ -167,6 +167,34 @@ app.post('/api/comfy/save-output', async (req, res) => {
   }
 });
 
+// Save a client-produced image (3D capture, Color Pick matte, processing node
+// output, etc.) directly to the configured output directory + a JSON sidecar.
+app.post('/api/save-image-file', upload.single('image'), (req, res) => {
+  try {
+    const outputDir = config.outputDir;
+    if (!outputDir) {
+      if (req.file) fs.unlink(req.file.path, () => {});
+      return res.json({ saved: false, reason: 'no output directory configured' });
+    }
+    if (!req.file) return res.status(400).json({ error: 'image required' });
+
+    fs.mkdirSync(outputDir, { recursive: true });
+    const filename = path.basename(req.body.filename || req.file.originalname || 'image.png');
+    const dest = path.join(outputDir, filename);
+    fs.copyFileSync(req.file.path, dest);
+    fs.unlink(req.file.path, () => {});
+
+    const metadata = req.body.metadata || JSON.stringify({ timestamp: new Date().toISOString() });
+    const sidecar = filename.replace(/\.(png|jpe?g|webp|gif)$/i, '.json');
+    fs.writeFileSync(path.join(outputDir, sidecar), metadata);
+
+    console.log(`[Output] Saved ${dest}`);
+    res.json({ saved: true, path: dest });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Prompt Library ───────────────────────────
 
 function getPromptsDir() {
