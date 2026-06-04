@@ -151,7 +151,7 @@ body,
 /* ── Breadcrumb ──────────────────────────────── */
 .cv-breadcrumb {
   position: absolute;
-  top: 52px;
+  top: 10px;
   left: 10px;
   z-index: 12;
   display: flex;
@@ -296,7 +296,7 @@ body,
   top: 0;
   left: 0;
   width: 320px;
-  height: 100vh;
+  height: 100%;
   background: var(--cv-panel);
   border-right: 1px solid var(--cv-border);
   z-index: 15;
@@ -589,15 +589,22 @@ body,
   color: #888;
 }
 
-/* ── Toolbar ─────────────────────────────────── */
+/* ── Top bar + content area ──────────────────── */
 .cv-toolbar {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 10;
   display: flex;
   gap: 6px;
   align-items: center;
+  height: 48px;
+  flex-shrink: 0;
+  padding: 0 10px;
+  background: var(--cv-panel);
+  border-bottom: 1px solid var(--cv-border);
+  z-index: 30;
+}
+.cv-content {
+  position: relative;
+  flex: 1;
+  min-height: 0;
 }
 .cv-toolbar button {
   background: #25253f;
@@ -720,7 +727,7 @@ body,
   top: 0;
   right: 0;
   width: 300px;
-  height: 100vh;
+  height: 100%;
   background: var(--cv-panel);
   border-left: 1px solid var(--cv-border);
   z-index: 10;

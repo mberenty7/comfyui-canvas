@@ -165,15 +165,16 @@ function Canvas() {
   }
 
   return (
-    <div
-      style={{ width: '100vw', height: '100vh' }}
-      onDrop={onDrop}
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'copy';
-      }}
-    >
+    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Toolbar />
+      <div
+        className="cv-content"
+        onDrop={onDrop}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+        }}
+      >
       <Breadcrumb />
       <ReactFlow
         nodes={nodes}
@@ -235,6 +236,7 @@ function Canvas() {
       <Viewer3DModal />
       {promptsOpen && <PromptLibrary />}
       {galleryOpen && <Gallery />}
+      </div>
     </div>
   );
 }
