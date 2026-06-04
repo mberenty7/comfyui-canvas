@@ -4,6 +4,7 @@ import { buildWorkflow, type WorkflowGraph, type InpaintResolver } from './nodes
 import { apiGet, apiPost, apiUpload, unwrap } from './api';
 import { WORKFLOW_HANDLE, IMAGE_HANDLE } from './ports';
 import { addLog, addVerbose, useLogStore } from './logStore';
+import { timestamp } from './imageProc';
 import type { GenerateNodeData, WorkflowNodeData } from './types';
 
 export interface GenResult {
@@ -143,6 +144,7 @@ export async function runGenerate(genId: string): Promise<void> {
     log(`Starting generation — ${wfData.templateName} ×${d.count} (${d.seedMode})`, 'info');
     const seeds = getSeeds(d);
     const results: GenResult[] = [];
+    const batchStamp = timestamp(); // shared across the batch; ComfyUI's counter disambiguates
 
     for (let i = 0; i < seeds.length; i++) {
       store.setGenStatus(genId, { state: 'running', text: `${i + 1}/${seeds.length}…` });
@@ -156,13 +158,13 @@ export async function runGenerate(genId: string): Promise<void> {
         if (seedParam) paramValues[seedParam.name] = seeds[i];
 
         if (wfData.backend === 'bfl') {
-          await runBflOne(wfData, connectedInputs, paramValues, seeds[i], d, results);
+          await runBflOne(wfData, connectedInputs, paramValues, seeds[i], d, results, batchStamp);
           continue;
         }
 
         const wf = await buildWorkflow({ ...wfData, paramValues }, connectedInputs, getNode, resolveInpaint);
         for (const key of Object.keys(wf)) {
-          if (wf[key].class_type === 'SaveImage') wf[key].inputs.filename_prefix = d.outputName;
+          if (wf[key].class_type === 'SaveImage') wf[key].inputs.filename_prefix = `${d.outputName}_${batchStamp}`;
         }
         addVerbose(`Workflow nodes: ${Object.values(wf).map((n) => n.class_type).join(', ')}`, 'info');
         addVerbose(`Workflow graph: ${JSON.stringify(wf).substring(0, 1500)}`, 'info');
@@ -324,6 +326,7 @@ async function runBflOne(
   seed: number,
   d: GenerateNodeData,
   results: GenResult[],
+  stamp: string,
 ) {
   // Gather prompt text + reference image from connected nodes.
   let promptText = '';
@@ -363,7 +366,7 @@ async function runBflOne(
   const result = await pollBflResult(data.id);
   if (result.status === 'Ready' && result.result?.sample) {
     const ext = params.output_format === 'jpeg' ? 'jpg' : 'png';
-    const filename = `${d.outputName}_${seed}.${ext}`;
+    const filename = `${d.outputName}_${stamp}_${seed}.${ext}`;
     const metadata = buildMetadata(wfData, connectedInputs, seed, d) as Record<string, unknown>;
     metadata.backend = 'bfl';
     metadata.bfl_endpoint = endpoint;
