@@ -6,7 +6,7 @@ import { useViewer3D } from '../viewer3d';
 import { useMaskEditor } from '../maskEditor';
 import { apiUpload } from '../api';
 import { addLog } from '../logStore';
-import { resolveImageUrl, loadImage, processColorPick, processOverlay, processGrade, sampleColor, uploadCanvas } from '../imageProc';
+import { resolveImageUrl, loadImage, processColorPick, processOverlay, processGrade, sampleColor, uploadCanvas, stampName } from '../imageProc';
 import { usePaintEditor } from '../paintEditor';
 import type {
   ColorPickNodeData,
@@ -595,7 +595,7 @@ function InpaintProperties({
         try {
           const blob = await (await fetch(maskDataUrl)).blob();
           const form = new FormData();
-          form.append('image', new File([blob], `mask_inpaint_${id}.png`, { type: 'image/png' }));
+          form.append('image', new File([blob], stampName(`mask_inpaint_${id}.png`), { type: 'image/png' }));
           const result = await apiUpload<{ comfyName?: string }>('/api/comfy/upload', form);
           if (result.comfyName) onChange(id, { maskComfyName: result.comfyName });
           addLog('Inpaint mask saved', 'success');

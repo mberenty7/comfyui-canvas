@@ -30,6 +30,13 @@ function focalToFov(mm) {
   return (2 * Math.atan(24 / (2 * mm)) * 180) / Math.PI;
 }
 
+// Compact local timestamp, e.g. "20260604-125301".
+function timestamp() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+
 class Viewer3D {
   constructor() {
     this.modal = null;
@@ -421,7 +428,7 @@ class Viewer3D {
     off.dispose();
     off.forceContextLoss();
 
-    await this._placeCapture(dataURL, `${this.mode}_${w}x${h}.png`, this.mode);
+    await this._placeCapture(dataURL, `${this.mode}_${w}x${h}_${timestamp()}.png`, this.mode);
   }
 
   async _placeCapture(dataURL, filename, label) {

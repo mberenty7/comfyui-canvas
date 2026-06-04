@@ -168,6 +168,21 @@ export function processGrade(img: HTMLImageElement, p: GradeParams): HTMLCanvasE
   return canvas;
 }
 
+/** Compact local timestamp, e.g. "20260604-125301". */
+export function timestamp(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+
+/** Insert a timestamp before the file extension: "x.png" → "x_20260604-125301.png". */
+export function stampName(filename: string): string {
+  const dot = filename.lastIndexOf('.');
+  const base = dot >= 0 ? filename.slice(0, dot) : filename;
+  const ext = dot >= 0 ? filename.slice(dot) : '';
+  return `${base}_${timestamp()}${ext}`;
+}
+
 /** Best-effort copy of a produced image to the configured output directory. */
 export async function saveToOutputDir(blob: Blob, filename: string, metadata?: Record<string, unknown>) {
   try {
@@ -183,15 +198,16 @@ export async function saveToOutputDir(blob: Blob, filename: string, metadata?: R
 
 /** Upload a canvas as a PNG to ComfyUI and return its URL + comfyName. */
 export async function uploadCanvas(canvas: HTMLCanvasElement, filename: string, metadata?: Record<string, unknown>) {
+  const name = stampName(filename);
   const blob: Blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b!), 'image/png'));
   const form = new FormData();
-  form.append('image', new File([blob], filename, { type: 'image/png' }));
+  form.append('image', new File([blob], name, { type: 'image/png' }));
   const result = await apiUpload<{ localPath?: string; path?: string; comfyName?: string }>('/api/comfy/upload', form);
   // Also copy to the output directory (best-effort).
-  saveToOutputDir(blob, filename, metadata);
+  saveToOutputDir(blob, name, metadata);
   return {
     url: result.localPath || result.path || '',
-    comfyName: result.comfyName || filename,
+    comfyName: result.comfyName || name,
     width: canvas.width,
     height: canvas.height,
   };
