@@ -1,3 +1,4 @@
+import { useReactFlow } from '@xyflow/react';
 import { useCanvasStore } from '../store';
 import { useLogStore } from '../logStore';
 import { useUI } from '../ui';
@@ -6,10 +7,12 @@ import { StatusDot } from './StatusDot';
 import type { CanvasFileV2 } from '../types';
 
 /**
- * Toolbar: Add-node dropdown, Save/Load, Log, Settings, and a connection dot.
+ * Toolbar: Add-node dropdown, Save/Load/Import, Log, Settings, and a connection dot.
  * Node creation lives in nodeActions; modals/menus are driven by the UI store.
  */
 export function Toolbar() {
+  const rf = useReactFlow();
+
   function saveCanvas() {
     // If nodes are selected, save just those (+ wires between them); else the whole canvas.
     const selection = useCanvasStore.getState().serializeSelection();
@@ -44,7 +47,8 @@ export function Toolbar() {
       const file = input.files?.[0];
       if (!file) return;
       const data = JSON.parse(await file.text()) as CanvasFileV2;
-      useCanvasStore.getState().importGraph(data);
+      const center = rf.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+      useCanvasStore.getState().importGraph(data, center);
     };
     input.click();
   }

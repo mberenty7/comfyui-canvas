@@ -55,7 +55,7 @@ interface CanvasState {
   serializeSelection: () => CanvasFileV2 | null;
   deserialize: (data: CanvasFileV2) => void;
   /** Merge a saved file into the current group with fresh ids (selects the result). */
-  importGraph: (data: CanvasFileV2) => void;
+  importGraph: (data: CanvasFileV2, center?: { x: number; y: number }) => void;
 }
 
 /** The group a node/edge belongs to ('root' by default). */
@@ -205,11 +205,23 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     return toCanvasFormat(subNodes, subEdges, { nodeIdCounter, zoom, viewport });
   },
 
-  importGraph: (data) => {
+  importGraph: (data, center) => {
     const result = fromCanvasFormat(data);
     if (result.nodes.length === 0) return;
     const group = get().currentGroup;
-    const OFFSET = 40;
+
+    // Translate the imported set so its bounding-box center lands at `center`
+    // (the current viewport center); otherwise nudge by a small offset.
+    let dx = 40;
+    let dy = 40;
+    if (center) {
+      const xs = result.nodes.map((n) => n.position.x);
+      const ys = result.nodes.map((n) => n.position.y);
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+      const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+      dx = center.x - cx;
+      dy = center.y - cy;
+    }
 
     // Assign fresh ids so nothing collides with the existing graph.
     let counter = get().nodeIdCounter;
@@ -226,7 +238,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       return {
         ...n,
         id: idMap.get(n.id)!,
-        position: { x: n.position.x + OFFSET, y: n.position.y + OFFSET },
+        position: { x: n.position.x + dx, y: n.position.y + dy },
         data: d,
         selected: true,
       };

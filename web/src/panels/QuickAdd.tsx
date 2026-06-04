@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { NODE_KINDS, createNodeAt, type NodeKind } from '../nodeActions';
 import { useUI } from '../ui';
 
-/** Tab-triggered quick-add menu — type to filter, Enter/click to insert. */
+/** Quick-add menu (Tab or right-click) — type to filter, Enter/click to insert. */
 export function QuickAdd() {
   const rf = useReactFlow();
+  const at = useUI((s) => s.quickAddAt);
   const close = () => useUI.getState().setQuickAddOpen(false);
   const [query, setQuery] = useState('');
 
@@ -16,13 +17,17 @@ export function QuickAdd() {
 
   function add(type: NodeKind) {
     close();
-    const center = rf.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
-    createNodeAt(type, center);
+    // Place at the right-click point if opened that way, else at viewport center.
+    const screen = at ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    createNodeAt(type, rf.screenToFlowPosition(screen));
   }
+
+  // Anchor the popup at the cursor when opened by right-click.
+  const style: CSSProperties = at ? { left: at.x, top: at.y, transform: 'none' } : {};
 
   return (
     <div className="cv-quickadd-overlay" onMouseDown={close}>
-      <div className="cv-quickadd" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="cv-quickadd" style={style} onMouseDown={(e) => e.stopPropagation()}>
         <input
           autoFocus
           className="prop-input"

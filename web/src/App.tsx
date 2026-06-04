@@ -99,7 +99,7 @@ function Canvas() {
         const store = useCanvasStore.getState();
         const sel = store.nodes.find((n) => n.id === store.selectedId);
         if (sel?.type === 'group') store.enterGroup(sel.id, (sel.data.label as string) || 'Group');
-        else useUI.getState().setQuickAddOpen(true);
+        else useUI.getState().openQuickAdd();
       } else if (e.key.toLowerCase() === 'd' && (e.ctrlKey || e.metaKey)) {
         const id = useCanvasStore.getState().selectedId;
         if (id) {
@@ -201,6 +201,7 @@ function Canvas() {
         onPaneContextMenu={(e) => {
           e.preventDefault();
           useUI.getState().closeContextMenu();
+          useUI.getState().openQuickAdd({ x: e.clientX, y: e.clientY });
         }}
         proOptions={{ hideAttribution: true }}
         fitView
