@@ -41,11 +41,18 @@ const MODELS_DIR = path.join(__dirname, 'models');
 fs.mkdirSync(MODELS_DIR, { recursive: true });
 
 app.use(express.json({ limit: '50mb' }));
-app.use(express.static('public'));
+// Routing:
+//   /        → React app (public/dist) — the default
+//   /app     → React app too (back-compat link)
+//   /legacy  → original fabric app (public/index.html) kept as a backup
+//   shared static assets (style.css, shaders, *.js, etc.) come from public/
+const DIST_DIR = path.join(__dirname, 'public/dist');
+app.use('/app', express.static(DIST_DIR));
+app.use('/legacy', express.static('public'));
+app.use(express.static(DIST_DIR)); // React app at root (its index.html)
+app.use(express.static('public')); // shared assets + legacy files
 app.use('/uploads', express.static(UPLOAD_DIR));
 app.use('/models', express.static(MODELS_DIR));
-// React Flow preview app (built by `npm run build:web` into public/dist).
-app.use('/app', express.static(path.join(__dirname, 'public/dist')));
 
 const upload = multer({ dest: UPLOAD_DIR });
 
