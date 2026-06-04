@@ -6,8 +6,9 @@ import { useViewer3D } from '../viewer3d';
 import { useMaskEditor } from '../maskEditor';
 import { apiUpload } from '../api';
 import { addLog } from '../logStore';
-import { resolveImageUrl, loadImage, processColorPick, processOverlay, processGrade, processGridJoin, splitImageQuads, sampleColor, uploadCanvas, stampName } from '../imageProc';
+import { resolveImageUrl, loadImage, processColorPick, processOverlay, processGrade, processGridJoin, sampleColor, uploadCanvas, stampName } from '../imageProc';
 import { templateTags, resolvePromptText, TAG_RE } from '../promptResolve';
+import { runGridSplit } from '../gridSplit';
 import { usePaintEditor } from '../paintEditor';
 import type {
   ColorPickNodeData,
@@ -1017,14 +1018,18 @@ function TemplateProperties({
   onChange: (id: string, patch: Record<string, unknown>) => void;
 }) {
   const edges = useCanvasStore((s) => s.edges);
+  // Subscribe to nodes so the preview live-updates when a connected Prompt's text changes.
+  const nodes = useCanvasStore((s) => s.nodes);
   const tags = templateTags(data.template || '');
   const defaults = data.tagDefaults || {};
 
   // Resolve a tag's current value (connected source text, else default).
   function tagValue(tag: string): string {
     const edge = edges.find((e) => e.target === id && e.targetHandle === `tag_${tag}`);
-    if (edge) return resolvePromptText(edge.source);
-    return defaults[tag] ?? '';
+    if (!edge) return defaults[tag] ?? '';
+    const src = nodes.find((n) => n.id === edge.source);
+    if (src?.type === 'prompt') return (src.data.positive as string) || '';
+    return resolvePromptText(edge.source); // nested template / other source
   }
 
   // Build a colored preview: filled tags green, empty tags red.
@@ -1158,29 +1163,6 @@ function GridSplitProperties({
 }) {
   const { img, connected } = useSourceImage(id, 'image');
 
-  async function split() {
-    if (!img) return;
-    const quads = splitImageQuads(img);
-    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
-    const base = node ? node.position : { x: 0, y: 0 };
-    const names = ['tl', 'tr', 'bl', 'br'];
-    const offsets = [
-      [220, -120],
-      [430, -120],
-      [220, 110],
-      [430, 110],
-    ];
-    for (let i = 0; i < 4; i++) {
-      const up = await uploadCanvas(quads[i], `split_${names[i]}_${id}.png`);
-      useCanvasStore.getState().addNode(
-        'image',
-        { label: `split ${names[i]}`, imageUrl: up.url, filename: up.comfyName, comfyName: up.comfyName, width: up.width, height: up.height, format: 'PNG' },
-        { x: base.x + offsets[i][0], y: base.y + offsets[i][1] },
-      );
-    }
-    addLog('Split into 4 images', 'success');
-  }
-
   return (
     <>
       <LabelField id={id} label={data.label} onChange={onChange} placeholder="e.g. Concept grid" />
@@ -1194,7 +1176,7 @@ function GridSplitProperties({
             </div>
           )}
           <div className="prop-section">
-            <button className="generate-btn" onClick={split}>✂️ Split into 4</button>
+            <button className="generate-btn" onClick={() => runGridSplit(id)}>✂️ Split into 4</button>
           </div>
         </>
       )}
