@@ -5,6 +5,7 @@ import { apiGet, apiPost, apiUpload, unwrap } from './api';
 import { WORKFLOW_HANDLE, IMAGE_HANDLE } from './ports';
 import { addLog, addVerbose, useLogStore } from './logStore';
 import { timestamp } from './imageProc';
+import { resolvePromptText } from './promptResolve';
 import type { GenerateNodeData, WorkflowNodeData } from './types';
 
 export interface GenResult {
@@ -162,7 +163,7 @@ export async function runGenerate(genId: string): Promise<void> {
           continue;
         }
 
-        const wf = await buildWorkflow({ ...wfData, paramValues }, connectedInputs, getNode, resolveInpaint);
+        const wf = await buildWorkflow({ ...wfData, paramValues }, connectedInputs, getNode, resolveInpaint, (id) => resolvePromptText(id));
         for (const key of Object.keys(wf)) {
           if (wf[key].class_type === 'SaveImage') wf[key].inputs.filename_prefix = `${d.outputName}_${batchStamp}`;
         }
@@ -336,8 +337,8 @@ async function runBflOne(
     if (!input) continue;
     const src = getNode(conn.nodeId);
     const sd = (src?.data ?? {}) as Record<string, unknown>;
-    if (input.type === 'prompt' && src?.type === 'prompt') {
-      promptText = (sd.positive as string) || '';
+    if (input.type === 'prompt' && (src?.type === 'prompt' || src?.type === 'template')) {
+      promptText = resolvePromptText(conn.nodeId);
     } else if (input.type === 'image' && src?.type === 'image') {
       const imgUrl = (sd.imageUrl as string) || (sd.comfyName as string);
       if (imgUrl) {

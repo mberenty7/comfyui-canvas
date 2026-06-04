@@ -11,6 +11,9 @@ import { OverlayNode } from './OverlayNode';
 import { GradeNode } from './GradeNode';
 import { PaintNode } from './PaintNode';
 import { GroupNode } from './GroupNode';
+import { TemplateNode } from './TemplateNode';
+import { GridJoinNode } from './GridJoinNode';
+import { GridSplitNode } from './GridSplitNode';
 
 /**
  * Registry of migrated node types. Types not listed here (tile-preview,
@@ -31,4 +34,7 @@ export const nodeTypes: NodeTypes = {
   grade: GradeNode,
   paint: PaintNode,
   group: GroupNode,
+  template: TemplateNode,
+  gridjoin: GridJoinNode,
+  gridsplit: GridSplitNode,
 };

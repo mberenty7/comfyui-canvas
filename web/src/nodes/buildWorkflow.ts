@@ -45,6 +45,7 @@ export async function buildWorkflow(
   connectedInputs: Record<string, { nodeId: string }>,
   getNode: (id: string) => Node | undefined,
   getInpaintData?: InpaintResolver,
+  getPromptText?: (nodeId: string) => string,
 ): Promise<WorkflowGraph> {
   let workflow = wfData.workflow as WorkflowGraph | undefined;
   let templateInputs = wfData.inputs ?? [];
@@ -114,16 +115,18 @@ export async function buildWorkflow(
       continue;
     }
 
-    if (input.type === 'prompt' && source.type === 'prompt') {
+    if (input.type === 'prompt' && (source.type === 'prompt' || source.type === 'template')) {
+      const positive = getPromptText ? getPromptText(source.id) : (srcData.positive as string) || '';
+      const negative = source.type === 'prompt' ? (srcData.negative as string) || '' : '';
       if (input.target_positive) {
         const tp = input.target_positive as { node: string; field: string };
         const node = wf[tp.node];
-        if (node) node.inputs[tp.field] = (srcData.positive as string) || '';
+        if (node) node.inputs[tp.field] = positive;
       }
       if (input.target_negative) {
         const tn = input.target_negative as { node: string; field: string };
         const node = wf[tn.node];
-        if (node) node.inputs[tn.field] = (srcData.negative as string) || '';
+        if (node) node.inputs[tn.field] = negative;
       }
     } else if (input.type === 'image' && srcData.comfyName) {
       // Any image-producing source (image, model capture, or a processing

@@ -142,6 +142,22 @@ export interface PaintNodeData extends ProcResultData {
   [key: string]: unknown;
 }
 
+export interface TemplateNodeData {
+  label: string;
+  template: string;
+  tagDefaults: Record<string, string>;
+  [key: string]: unknown;
+}
+
+export interface GridJoinNodeData extends ProcResultData {
+  [key: string]: unknown;
+}
+
+export interface GridSplitNodeData {
+  label: string;
+  [key: string]: unknown;
+}
+
 /** Output port "type" a node emits, used for connection validation. */
 export type PortType = 'image' | 'prompt' | 'workflow' | 'model';
 

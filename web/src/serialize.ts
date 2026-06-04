@@ -10,7 +10,7 @@ const SINGLE_CONN: Record<string, [string, string]> = {
 };
 
 /** Node types that store a handle-keyed connectedInputs map (multi-input). */
-const MULTI_CONN = new Set(['workflow', 'colorpick', 'overlay', 'grade', 'paint']);
+const MULTI_CONN = new Set(['workflow', 'colorpick', 'overlay', 'grade', 'paint', 'template', 'gridjoin', 'gridsplit']);
 
 /**
  * Keys that live at the top level of a legacy node object and therefore must

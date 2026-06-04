@@ -6,18 +6,22 @@ import { useViewer3D } from '../viewer3d';
 import { useMaskEditor } from '../maskEditor';
 import { apiUpload } from '../api';
 import { addLog } from '../logStore';
-import { resolveImageUrl, loadImage, processColorPick, processOverlay, processGrade, sampleColor, uploadCanvas, stampName } from '../imageProc';
+import { resolveImageUrl, loadImage, processColorPick, processOverlay, processGrade, processGridJoin, splitImageQuads, sampleColor, uploadCanvas, stampName } from '../imageProc';
+import { templateTags, resolvePromptText, TAG_RE } from '../promptResolve';
 import { usePaintEditor } from '../paintEditor';
 import type {
   ColorPickNodeData,
   GenerateNodeData,
   GradeNodeData,
+  GridJoinNodeData,
+  GridSplitNodeData,
   ImageNodeData,
   InpaintNodeData,
   ModelNodeData,
   OverlayNodeData,
   PaintNodeData,
   PromptNodeData,
+  TemplateNodeData,
   TemplateParam,
   ViewerNodeData,
   WorkflowNodeData,
@@ -99,7 +103,10 @@ export function PropertiesPanel() {
         {node.type === 'grade' && <GradeProperties id={node.id} data={node.data as GradeNodeData} onChange={updateNodeData} />}
         {node.type === 'paint' && <PaintProperties id={node.id} data={node.data as PaintNodeData} onChange={updateNodeData} />}
         {node.type === 'group' && <GroupProperties id={node.id} label={(node.data.label as string) || 'Group'} onChange={updateNodeData} />}
-        {!['prompt', 'image', 'workflow', 'generate', 'model', 'viewer', 'inpaint', 'colorpick', 'overlay', 'grade', 'paint', 'group'].includes(node.type ?? '') && (
+        {node.type === 'template' && <TemplateProperties id={node.id} data={node.data as TemplateNodeData} onChange={updateNodeData} />}
+        {node.type === 'gridjoin' && <GridJoinProperties id={node.id} data={node.data as GridJoinNodeData} onChange={updateNodeData} />}
+        {node.type === 'gridsplit' && <GridSplitProperties id={node.id} data={node.data as GridSplitNodeData} onChange={updateNodeData} />}
+        {!['prompt', 'image', 'workflow', 'generate', 'model', 'viewer', 'inpaint', 'colorpick', 'overlay', 'grade', 'paint', 'group', 'template', 'gridjoin', 'gridsplit'].includes(node.type ?? '') && (
           <div className="prop-section">
             <label className="prop-section-label">Type</label>
             <div className="prop-value">{node.type}</div>
@@ -997,6 +1004,201 @@ function LabelField({
       <label className="prop-section-label">Label</label>
       <input type="text" className="prop-input" value={label ?? ''} placeholder={placeholder} onChange={(e) => onChange(id, { label: e.target.value })} />
     </div>
+  );
+}
+
+function TemplateProperties({
+  id,
+  data,
+  onChange,
+}: {
+  id: string;
+  data: TemplateNodeData;
+  onChange: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  const edges = useCanvasStore((s) => s.edges);
+  const tags = templateTags(data.template || '');
+  const defaults = data.tagDefaults || {};
+
+  // Resolve a tag's current value (connected source text, else default).
+  function tagValue(tag: string): string {
+    const edge = edges.find((e) => e.target === id && e.targetHandle === `tag_${tag}`);
+    if (edge) return resolvePromptText(edge.source);
+    return defaults[tag] ?? '';
+  }
+
+  // Build a colored preview: filled tags green, empty tags red.
+  const segments: { text: string; kind: 'plain' | 'filled' | 'empty' }[] = [];
+  const tpl = data.template || '';
+  let last = 0;
+  for (const m of tpl.matchAll(TAG_RE)) {
+    if (m.index! > last) segments.push({ text: tpl.slice(last, m.index), kind: 'plain' });
+    const val = tagValue(m[1]);
+    segments.push(val ? { text: val, kind: 'filled' } : { text: `<${m[1]}>`, kind: 'empty' });
+    last = m.index! + m[0].length;
+  }
+  if (last < tpl.length) segments.push({ text: tpl.slice(last), kind: 'plain' });
+
+  function setDefault(tag: string, value: string) {
+    onChange(id, { tagDefaults: { ...defaults, [tag]: value } });
+  }
+
+  const connectedTags = new Set(
+    edges.filter((e) => e.target === id && e.targetHandle?.startsWith('tag_')).map((e) => e.targetHandle!.slice(4)),
+  );
+
+  return (
+    <>
+      <LabelField id={id} label={data.label} onChange={onChange} placeholder="e.g. Portrait template" />
+      <div className="prop-section">
+        <label className="prop-section-label">Template</label>
+        <textarea
+          className="prop-textarea"
+          rows={4}
+          value={data.template ?? ''}
+          placeholder="A <style> photo of <subject> with <lighting> lighting"
+          onChange={(e) => onChange(id, { template: e.target.value })}
+        />
+      </div>
+      <div className="prop-section">
+        <label className="prop-section-label">Preview</label>
+        <div className="cv-template-preview">
+          {segments.map((s, i) => (
+            <span key={i} className={s.kind === 'filled' ? 'cv-tag-filled' : s.kind === 'empty' ? 'cv-tag-empty' : undefined}>{s.text}</span>
+          ))}
+        </div>
+      </div>
+      {tags.length > 0 && (
+        <div className="prop-section">
+          <label className="prop-section-label">Tag Defaults</label>
+          {tags.map((tag) => (
+            <div key={tag} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ fontSize: 11, color: '#f5a623', fontFamily: 'monospace', minWidth: 70 }}>{tag}</span>
+              <input
+                className="prop-input"
+                style={{ flex: 1, fontSize: 11 }}
+                value={defaults[tag] ?? ''}
+                placeholder={connectedTags.has(tag) ? '(from connection)' : 'default…'}
+                disabled={connectedTags.has(tag)}
+                onChange={(e) => setDefault(tag, e.target.value)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function GridJoinProperties({
+  id,
+  data,
+  onChange,
+}: {
+  id: string;
+  data: GridJoinNodeData;
+  onChange: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  const tl = useSourceImage(id, 'quad_tl');
+  const tr = useSourceImage(id, 'quad_tr');
+  const bl = useSourceImage(id, 'quad_bl');
+  const br = useSourceImage(id, 'quad_br');
+  const quads = [tl, tr, bl, br];
+  const connected = quads.filter((q) => q.connected).length;
+  const [preview, setPreview] = useState('');
+
+  useEffect(() => {
+    const imgs = quads.map((q) => q.img);
+    const canvas = processGridJoin(imgs);
+    setPreview(canvas ? canvas.toDataURL('image/png') : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tl.img, tr.img, bl.img, br.img]);
+
+  async function save() {
+    const canvas = processGridJoin(quads.map((q) => q.img));
+    if (!canvas) return;
+    const up = await uploadCanvas(canvas, `gridjoin_${id}.png`);
+    onChange(id, { resultUrl: up.url, comfyName: up.comfyName, width: up.width, height: up.height });
+    addLog('Grid join saved', 'success');
+  }
+
+  return (
+    <>
+      <LabelField id={id} label={data.label} onChange={onChange} placeholder="e.g. Comparison sheet" />
+      <PropRow label="Connected" value={`${connected}/4`} />
+      <div className="prop-section">
+        <div className="cv-quad-diagram">
+          <span style={{ opacity: tl.connected ? 1 : 0.3 }}>↖</span>
+          <span style={{ opacity: tr.connected ? 1 : 0.3 }}>↗</span>
+          <span style={{ opacity: bl.connected ? 1 : 0.3 }}>↙</span>
+          <span style={{ opacity: br.connected ? 1 : 0.3 }}>↘</span>
+        </div>
+      </div>
+      {preview && (
+        <div className="prop-section">
+          <label className="prop-section-label">Preview</label>
+          <img className="cv-proc-preview" src={preview} alt="grid" />
+        </div>
+      )}
+      <div className="prop-section">
+        <button className="generate-btn" disabled={connected === 0} onClick={save}>💾 Save Grid</button>
+      </div>
+    </>
+  );
+}
+
+function GridSplitProperties({
+  id,
+  data,
+  onChange,
+}: {
+  id: string;
+  data: GridSplitNodeData;
+  onChange: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  const { img, connected } = useSourceImage(id, 'image');
+
+  async function split() {
+    if (!img) return;
+    const quads = splitImageQuads(img);
+    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
+    const base = node ? node.position : { x: 0, y: 0 };
+    const names = ['tl', 'tr', 'bl', 'br'];
+    const offsets = [
+      [220, -120],
+      [430, -120],
+      [220, 110],
+      [430, 110],
+    ];
+    for (let i = 0; i < 4; i++) {
+      const up = await uploadCanvas(quads[i], `split_${names[i]}_${id}.png`);
+      useCanvasStore.getState().addNode(
+        'image',
+        { label: `split ${names[i]}`, imageUrl: up.url, filename: up.comfyName, comfyName: up.comfyName, width: up.width, height: up.height, format: 'PNG' },
+        { x: base.x + offsets[i][0], y: base.y + offsets[i][1] },
+      );
+    }
+    addLog('Split into 4 images', 'success');
+  }
+
+  return (
+    <>
+      <LabelField id={id} label={data.label} onChange={onChange} placeholder="e.g. Concept grid" />
+      {!connected ? (
+        <p className="cv-proc-hint">Connect an image to the input port.</p>
+      ) : (
+        <>
+          {img && (
+            <div className="prop-section">
+              <img className="cv-proc-preview" src={img.src} alt="source" />
+            </div>
+          )}
+          <div className="prop-section">
+            <button className="generate-btn" onClick={split}>✂️ Split into 4</button>
+          </div>
+        </>
+      )}
+    </>
   );
 }
 

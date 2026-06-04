@@ -93,6 +93,41 @@ body,
 .cv-handle-generate {
   background: #4caf50;
 }
+.cv-handle-text {
+  background: #f5a623;
+}
+
+/* ── Template node + preview ─────────────────── */
+.cv-node-template {
+  border-color: #f5a623;
+  width: 170px;
+  position: relative;
+}
+.cv-template-preview {
+  font-size: 12px;
+  line-height: 1.5;
+  background: #15152b;
+  border: 1px solid var(--cv-border);
+  border-radius: 4px;
+  padding: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #ccc;
+}
+.cv-tag-filled {
+  color: #4caf50;
+}
+.cv-tag-empty {
+  color: #ff5577;
+}
+.cv-quad-diagram {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  width: 60px;
+  font-size: 16px;
+  text-align: center;
+}
 
 /* ── Processing nodes (Color Pick / Overlay) ─── */
 .cv-node-proc {

@@ -168,6 +168,54 @@ export function processGrade(img: HTMLImageElement, p: GradeParams): HTMLCanvasE
   return canvas;
 }
 
+/** Combine up to 4 images into a square 2×2 grid (order: tl, tr, bl, br). */
+export function processGridJoin(quads: (HTMLImageElement | null)[]): HTMLCanvasElement | null {
+  const present = quads.filter(Boolean) as HTMLImageElement[];
+  if (present.length === 0) return null;
+  const cell = Math.max(...present.map((i) => Math.max(i.naturalWidth, i.naturalHeight)));
+  const canvas = document.createElement('canvas');
+  canvas.width = cell * 2;
+  canvas.height = cell * 2;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const cellPos = [
+    [0, 0],
+    [cell, 0],
+    [0, cell],
+    [cell, cell],
+  ];
+  quads.forEach((img, i) => {
+    if (!img) return;
+    // Contain within the cell, centered.
+    const s = Math.min(cell / img.naturalWidth, cell / img.naturalHeight);
+    const w = img.naturalWidth * s;
+    const h = img.naturalHeight * s;
+    const [cxBase, cyBase] = cellPos[i];
+    ctx.drawImage(img, cxBase + (cell - w) / 2, cyBase + (cell - h) / 2, w, h);
+  });
+  return canvas;
+}
+
+/** Split an image into 4 equal quadrant canvases (order: tl, tr, bl, br). */
+export function splitImageQuads(img: HTMLImageElement): HTMLCanvasElement[] {
+  const hw = Math.floor(img.naturalWidth / 2);
+  const hh = Math.floor(img.naturalHeight / 2);
+  const regions = [
+    [0, 0],
+    [hw, 0],
+    [0, hh],
+    [hw, hh],
+  ];
+  return regions.map(([sx, sy]) => {
+    const c = document.createElement('canvas');
+    c.width = hw;
+    c.height = hh;
+    c.getContext('2d')!.drawImage(img, sx, sy, hw, hh, 0, 0, hw, hh);
+    return c;
+  });
+}
+
 /** Compact local timestamp, e.g. "20260604-125301". */
 export function timestamp(): string {
   const d = new Date();

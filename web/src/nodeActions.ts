@@ -4,11 +4,13 @@ import { apiUpload } from './api';
 
 export type NodeKind =
   | 'prompt' | 'image' | 'workflow' | 'generate' | 'model' | 'viewer'
-  | 'inpaint' | 'colorpick' | 'overlay' | 'grade' | 'paint' | 'group';
+  | 'inpaint' | 'colorpick' | 'overlay' | 'grade' | 'paint' | 'group'
+  | 'template' | 'gridjoin' | 'gridsplit';
 
 /** The node types offered in the Add-node menu and Tab quick-add. */
 export const NODE_KINDS: { type: NodeKind; label: string }[] = [
   { type: 'prompt', label: '✏️ Prompt' },
+  { type: 'template', label: '🔤 Template' },
   { type: 'image', label: '📷 Image' },
   { type: 'workflow', label: '⚙️ Workflow' },
   { type: 'inpaint', label: '🎨 Inpaint' },
@@ -16,6 +18,8 @@ export const NODE_KINDS: { type: NodeKind; label: string }[] = [
   { type: 'grade', label: '🎚 Grade' },
   { type: 'colorpick', label: '🎯 Color Pick' },
   { type: 'overlay', label: '🟥 Overlay' },
+  { type: 'gridjoin', label: '🔳 Grid Join' },
+  { type: 'gridsplit', label: '✂️ Grid Split' },
   { type: 'model', label: '🎲 3D Model' },
   { type: 'viewer', label: '👁 3D Viewer' },
   { type: 'generate', label: '▶ Generate' },
@@ -148,6 +152,15 @@ export function createNodeAt(type: NodeKind, pos: Pos) {
       break;
     case 'group':
       store.addNode('group', { label: 'Group' }, { x: pos.x - 70, y: pos.y - 30 });
+      break;
+    case 'template':
+      store.addNode('template', { label: '', template: 'A <style> photo of <subject>', tagDefaults: {} }, { x: pos.x - 90, y: pos.y - 30 });
+      break;
+    case 'gridjoin':
+      store.addNode('gridjoin', { label: '', resultUrl: null, comfyName: null }, { x: pos.x - 85, y: pos.y - 55 });
+      break;
+    case 'gridsplit':
+      store.addNode('gridsplit', { label: '' }, { x: pos.x - 70, y: pos.y - 25 });
       break;
     case 'workflow':
       useUI.getState().openWorkflowPicker(pos);

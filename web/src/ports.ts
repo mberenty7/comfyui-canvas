@@ -23,6 +23,8 @@ export const PROC_INPUTS: Record<string, string[]> = {
   overlay: ['image', 'matte'],
   grade: ['image', 'compare'],
   paint: ['image'],
+  gridjoin: ['quad_tl', 'quad_tr', 'quad_bl', 'quad_br'],
+  gridsplit: ['image'],
 };
 
 /**
@@ -43,10 +45,14 @@ export function sourceProvides(node: Node): PortType[] {
     case 'overlay':
     case 'grade':
     case 'paint':
+    case 'gridjoin':
       return ['image'];
+    case 'template':
+      return ['prompt'];
     case 'model':
       return ['image', 'model'];
     default:
+      // gridsplit has no output (it spawns Image nodes).
       return [];
   }
 }
@@ -61,6 +67,8 @@ export function inputType(node: Node, handleId: string | null | undefined): Port
   if (node.type === 'generate' && handleId === WORKFLOW_HANDLE) return 'workflow';
   if (node.type === 'viewer' && handleId === MODEL_HANDLE) return 'model';
   if (node.type === 'inpaint' && handleId === IMAGE_HANDLE) return 'image';
+  // Template tag inputs accept prompt sources (Prompt nodes or other Templates).
+  if (node.type === 'template' && handleId?.startsWith('tag_')) return 'prompt';
   if (node.type && PROC_INPUTS[node.type]?.includes(handleId ?? '')) return 'image';
   return null;
 }
