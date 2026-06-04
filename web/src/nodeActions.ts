@@ -7,24 +7,41 @@ export type NodeKind =
   | 'inpaint' | 'colorpick' | 'overlay' | 'grade' | 'paint' | 'group'
   | 'template' | 'gridjoin' | 'gridsplit';
 
+export interface NodeKindDef {
+  type: NodeKind;
+  label: string;
+  category: string;
+}
+
 /** The node types offered in the Add-node menu and Tab quick-add. */
-export const NODE_KINDS: { type: NodeKind; label: string }[] = [
-  { type: 'prompt', label: '✏️ Prompt' },
-  { type: 'template', label: '🔤 Template' },
-  { type: 'image', label: '📷 Image' },
-  { type: 'workflow', label: '⚙️ Workflow' },
-  { type: 'inpaint', label: '🎨 Inpaint' },
-  { type: 'paint', label: '🖌 Paint' },
-  { type: 'grade', label: '🎚 Grade' },
-  { type: 'colorpick', label: '🎯 Color Pick' },
-  { type: 'overlay', label: '🟥 Overlay' },
-  { type: 'gridjoin', label: '🔳 Grid Join' },
-  { type: 'gridsplit', label: '✂️ Grid Split' },
-  { type: 'model', label: '🎲 3D Model' },
-  { type: 'viewer', label: '👁 3D Viewer' },
-  { type: 'generate', label: '▶ Generate' },
-  { type: 'group', label: '📦 Group' },
+export const NODE_KINDS: NodeKindDef[] = [
+  { type: 'prompt', label: '✏️ Prompt', category: 'Inputs' },
+  { type: 'template', label: '🔤 Template', category: 'Inputs' },
+  { type: 'image', label: '📷 Image', category: 'Inputs' },
+  { type: 'workflow', label: '⚙️ Workflow', category: 'Generate' },
+  { type: 'generate', label: '▶ Generate', category: 'Generate' },
+  { type: 'inpaint', label: '🎨 Inpaint', category: 'Image AI' },
+  { type: 'paint', label: '🖌 Paint', category: 'Image AI' },
+  { type: 'grade', label: '🎚 Grade', category: 'Color' },
+  { type: 'overlay', label: '🟥 Overlay', category: 'Color' },
+  { type: 'model', label: '🎲 3D Model', category: '3D' },
+  { type: 'viewer', label: '👁 3D Viewer', category: '3D' },
+  { type: 'colorpick', label: '🎯 Color Pick', category: '3D' },
+  { type: 'gridjoin', label: '🔳 Grid Join', category: 'Utility' },
+  { type: 'gridsplit', label: '✂️ Grid Split', category: 'Utility' },
+  { type: 'group', label: '📦 Group', category: 'Utility' },
 ];
+
+export const NODE_CATEGORIES = ['Inputs', 'Generate', 'Image AI', 'Color', '3D', 'Utility'];
+
+/** Node kinds grouped by category, optionally filtered by a search string. */
+export function groupedNodeKinds(filter = ''): { category: string; items: NodeKindDef[] }[] {
+  const q = filter.toLowerCase();
+  return NODE_CATEGORIES.map((category) => ({
+    category,
+    items: NODE_KINDS.filter((k) => k.category === category && k.label.toLowerCase().includes(q)),
+  })).filter((g) => g.items.length > 0);
+}
 
 type Pos = { x: number; y: number };
 

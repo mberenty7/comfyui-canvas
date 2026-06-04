@@ -1,6 +1,6 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import { useReactFlow } from '@xyflow/react';
-import { NODE_KINDS, createNodeAt, type NodeKind } from '../nodeActions';
+import { groupedNodeKinds, createNodeAt, type NodeKind } from '../nodeActions';
 import { useUI } from '../ui';
 
 /** Quick-add menu (Tab or right-click) — type to filter, Enter/click to insert. */
@@ -10,10 +10,8 @@ export function QuickAdd() {
   const close = () => useUI.getState().setQuickAddOpen(false);
   const [query, setQuery] = useState('');
 
-  const filtered = useMemo(
-    () => NODE_KINDS.filter((k) => k.label.toLowerCase().includes(query.toLowerCase())),
-    [query],
-  );
+  const groups = useMemo(() => groupedNodeKinds(query), [query]);
+  const firstMatch = groups[0]?.items[0];
 
   function add(type: NodeKind) {
     close();
@@ -36,16 +34,21 @@ export function QuickAdd() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Escape') close();
-            if (e.key === 'Enter' && filtered[0]) add(filtered[0].type);
+            if (e.key === 'Enter' && firstMatch) add(firstMatch.type);
           }}
         />
         <div className="cv-quickadd-list">
-          {filtered.map((k) => (
-            <div key={k.type} className="cv-quickadd-item" onClick={() => add(k.type)}>
-              {k.label}
+          {groups.map((group) => (
+            <div key={group.category}>
+              <div className="cv-menu-cat">{group.category}</div>
+              {group.items.map((k) => (
+                <div key={k.type} className="cv-quickadd-item" onClick={() => add(k.type)}>
+                  {k.label}
+                </div>
+              ))}
             </div>
           ))}
-          {filtered.length === 0 && <div className="cv-quickadd-empty">No matches</div>}
+          {groups.length === 0 && <div className="cv-quickadd-empty">No matches</div>}
         </div>
       </div>
     </div>

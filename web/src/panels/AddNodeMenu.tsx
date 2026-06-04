@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useReactFlow } from '@xyflow/react';
-import { NODE_KINDS, createNodeAt } from '../nodeActions';
+import { groupedNodeKinds, createNodeAt, type NodeKind } from '../nodeActions';
 
 /** Toolbar "➕ Add Node" dropdown — replaces the individual node buttons. */
 export function AddNodeMenu() {
@@ -17,7 +17,7 @@ export function AddNodeMenu() {
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
-  function add(type: (typeof NODE_KINDS)[number]['type']) {
+  function add(type: NodeKind) {
     setOpen(false);
     const center = rf.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
     createNodeAt(type, center);
@@ -28,9 +28,14 @@ export function AddNodeMenu() {
       <button onClick={() => setOpen((o) => !o)}>➕ Add Node ▾</button>
       {open && (
         <div className="cv-dropdown-menu">
-          {NODE_KINDS.map((k) => (
-            <div key={k.type} className="cv-dropdown-item" onClick={() => add(k.type)}>
-              {k.label}
+          {groupedNodeKinds().map((group) => (
+            <div key={group.category}>
+              <div className="cv-menu-cat">{group.category}</div>
+              {group.items.map((k) => (
+                <div key={k.type} className="cv-dropdown-item" onClick={() => add(k.type)}>
+                  {k.label}
+                </div>
+              ))}
             </div>
           ))}
         </div>

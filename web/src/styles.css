@@ -676,6 +676,13 @@ body,
   padding: 4px;
   z-index: 30;
 }
+.cv-menu-cat {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6a6a8a;
+  padding: 8px 10px 3px;
+}
 .cv-dropdown-item {
   padding: 6px 10px;
   font-size: 12px;
