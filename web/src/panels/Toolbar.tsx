@@ -11,12 +11,14 @@ import type { CanvasFileV2 } from '../types';
  */
 export function Toolbar() {
   function saveCanvas() {
-    const data = useCanvasStore.getState().serialize();
+    // If nodes are selected, save just those (+ wires between them); else the whole canvas.
+    const selection = useCanvasStore.getState().serializeSelection();
+    const data = selection ?? useCanvasStore.getState().serialize();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'canvas-project.json';
+    a.download = selection ? 'canvas-selection.json' : 'canvas-project.json';
     a.click();
     URL.revokeObjectURL(url);
   }

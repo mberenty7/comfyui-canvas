@@ -51,6 +51,8 @@ interface CanvasState {
 
   // Persistence (legacy v2 compatible)
   serialize: () => CanvasFileV2;
+  /** Serialize only the selected nodes (+ wires between them), or null if none selected. */
+  serializeSelection: () => CanvasFileV2 | null;
   deserialize: (data: CanvasFileV2) => void;
 }
 
@@ -186,6 +188,19 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   serialize: () => {
     const { nodes, edges, nodeIdCounter, zoom, viewport } = get();
     return toCanvasFormat(nodes, edges, { nodeIdCounter, zoom, viewport });
+  },
+
+  serializeSelection: () => {
+    const { nodes, edges, nodeIdCounter, zoom, viewport } = get();
+    const selected = nodes.filter((n) => n.selected);
+    if (selected.length === 0) return null;
+    const ids = new Set(selected.map((n) => n.id));
+    // Normalize to root so the saved subset loads at the top level.
+    const subNodes = selected.map((n) => ({ ...n, data: { ...n.data, group: 'root' } }));
+    const subEdges = edges
+      .filter((e) => ids.has(e.source) && ids.has(e.target))
+      .map((e) => ({ ...e, data: { ...e.data, group: 'root' } }));
+    return toCanvasFormat(subNodes, subEdges, { nodeIdCounter, zoom, viewport });
   },
 
   deserialize: (data) => {
