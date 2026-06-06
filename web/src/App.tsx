@@ -250,6 +250,9 @@ function Canvas() {
         edges={edges}
         nodeTypes={nodeTypes}
         deleteKeyCode={['Backspace', 'Delete']}
+        // Keep selected nodes at their own z-index so a selected Network Box never
+        // jumps in front of (and blocks clicks to) the nodes it contains.
+        elevateNodesOnSelect={false}
         selectionOnDrag
         panOnDrag={[1]}
         selectionKeyCode={null}
