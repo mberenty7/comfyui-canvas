@@ -37,6 +37,9 @@ export interface ReferenceNodeData extends ImageNodeData {
   display?: 'color' | 'grayscale' | 'luminance';
   opacity?: number;
   crop?: { x: number; y: number; w: number; h: number } | null;
+  /** On-canvas display size (independent of the image's intrinsic dimensions). */
+  viewW?: number;
+  viewH?: number;
 }
 
 /** A typed input slot declared by a workflow template's config.json. */

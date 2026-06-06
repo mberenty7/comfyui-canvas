@@ -1190,22 +1190,48 @@ function GridSplitProperties({
 const BOX_COLORS = ['#4a9eff', '#a855f7', '#4caf50', '#e94560', '#f5a623', '#888'];
 
 function ReferenceProperties({
+  id,
   data,
+  onChange,
 }: {
   id: string;
   data: ReferenceNodeData;
   onChange: (id: string, patch: Record<string, unknown>) => void;
 }) {
+  const display = data.display ?? 'color';
+  const filter = display === 'grayscale' ? 'grayscale(1)' : display === 'luminance' ? 'url(#cv-luminance)' : undefined;
+  const kb = data.fileSize ? `${Math.round(data.fileSize / 1024).toLocaleString()} KB` : null;
   return (
     <>
       <div className="prop-section">
-        <label className="prop-section-label">Reference</label>
-        <PropRow label="File" value={data.filename || '—'} />
-        {data.width && data.height ? <PropRow label="Size" value={`${data.width} × ${data.height}`} /> : null}
-        {data.format ? <PropRow label="Format" value={data.format} /> : null}
-        <PropRow label="Stored" value={data.imageUrl?.startsWith('/references/') ? 'references/ (deduped)' : 'in place'} />
+        <label className="prop-section-label">Preview</label>
+        {data.imageUrl ? (
+          <a href={data.imageUrl} target="_blank" rel="noreferrer" title="Open full size">
+            <img
+              src={data.imageUrl}
+              alt={data.filename || ''}
+              style={{ width: '100%', maxHeight: 240, objectFit: 'contain', borderRadius: 4, background: '#0d0d18', filter, opacity: data.opacity ?? 1 }}
+            />
+          </a>
+        ) : (
+          <div style={{ padding: 20, textAlign: 'center', color: '#666', background: '#0d0d18', borderRadius: 4 }}>no image</div>
+        )}
       </div>
-      <p style={{ fontSize: 11, color: '#666' }}>Connect the output to a Workflow or Inpaint to use it as an image input. Display controls (grayscale / luminance / opacity / crop) arrive next.</p>
+      <div className="prop-section">
+        <label className="prop-section-label">Label</label>
+        <input type="text" className="prop-input" value={data.label ?? ''} placeholder="e.g. hero pose" onChange={(e) => onChange(id, { label: e.target.value })} />
+      </div>
+      <div className="prop-section">
+        <label className="prop-section-label">Info</label>
+        <PropRow label="File" value={data.filename || '—'} />
+        {data.width && data.height ? <PropRow label="Dimensions" value={`${data.width} × ${data.height}`} /> : null}
+        {data.viewW && data.viewH ? <PropRow label="On canvas" value={`${Math.round(data.viewW)} × ${Math.round(data.viewH)}`} /> : null}
+        {data.format ? <PropRow label="Format" value={data.format} /> : null}
+        {kb ? <PropRow label="Size" value={kb} /> : null}
+        <PropRow label="Stored" value={data.imageUrl?.startsWith('/references/') ? 'references/ (deduped)' : 'in place'} />
+        {data.comfyName ? <PropRow label="ComfyUI" value={data.comfyName} /> : null}
+      </div>
+      <p style={{ fontSize: 11, color: '#666' }}>Resize on the canvas by dragging a corner. Connect the output to a Workflow or Inpaint to use it as an image input. Display controls (grayscale / luminance / opacity / crop) arrive next.</p>
     </>
   );
 }

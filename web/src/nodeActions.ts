@@ -115,6 +115,8 @@ export async function uploadReferenceFile(file: File, pos: Pos): Promise<string 
     return;
   }
   const dims = await imageDimensions(result.path);
+  const viewW = 220;
+  const viewH = dims.width ? Math.round((viewW * dims.height) / dims.width) : 220;
   return useCanvasStore.getState().addNode(
     'reference',
     {
@@ -129,8 +131,10 @@ export async function uploadReferenceFile(file: File, pos: Pos): Promise<string 
       display: 'color',
       opacity: 1,
       crop: null,
+      viewW,
+      viewH,
     },
-    { x: pos.x - 90, y: pos.y - 90 },
+    { x: pos.x - viewW / 2, y: pos.y - viewH / 2 },
   );
 }
 

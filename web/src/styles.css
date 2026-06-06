@@ -98,11 +98,49 @@ body,
 }
 
 /* ── Reference node ──────────────────────────── */
+.cv-node-reference {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid #3a3a3a;
+  background: #15152b;
+  box-sizing: border-box;
+}
 .cv-node-reference.selected {
   box-shadow: 0 0 0 2px #f5a623;
+  border-color: #f5a623;
+}
+.cv-reference-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .cv-reference-tag {
-  color: #f5a623 !important;
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.cv-reference-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 3px 6px;
+  font-size: 11px;
+  color: #fff;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Network box ─────────────────────────────── */
