@@ -9,14 +9,17 @@ const createComfyRouter = require('./server/routes/comfy');
 const createWorkflowRouter = require('./server/routes/workflow');
 const multer = require('multer');
 const fs = require('fs');
+const crypto = require('crypto');
 const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
+const REFERENCES_DIR = path.join(__dirname, 'references');
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+fs.mkdirSync(REFERENCES_DIR, { recursive: true });
 
 // Load or create config
 function loadConfig() {
@@ -52,6 +55,7 @@ app.use('/legacy', express.static('public'));
 app.use(express.static(DIST_DIR)); // React app at root (its index.html)
 app.use(express.static('public')); // shared assets + legacy files
 app.use('/uploads', express.static(UPLOAD_DIR));
+app.use('/references', express.static(REFERENCES_DIR));
 app.use('/models', express.static(MODELS_DIR));
 
 const upload = multer({ dest: UPLOAD_DIR });
@@ -86,6 +90,52 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
       originalName: file.originalname,
       path: `/uploads/${path.basename(newPath)}`,
       comfyName: path.basename(newPath),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Reference Repository ─────────────────────
+// Copies an image into references/ keyed by content hash (sha256) so the same
+// image is never stored twice, then best-effort uploads it to ComfyUI so the
+// reference can be wired into workflows. The board stays self-contained: it
+// points at /references/<hash>.<ext>, which survives the source being moved.
+
+app.post('/api/references', upload.single('image'), async (req, res) => {
+  try {
+    const file = req.file;
+    const data = fs.readFileSync(file.path);
+    const hash = crypto.createHash('sha256').update(data).digest('hex').slice(0, 24);
+    const ext = (path.extname(file.originalname) || '.png').toLowerCase();
+    const name = `${hash}${ext}`;
+    const dest = path.join(REFERENCES_DIR, name);
+
+    let deduped = true;
+    if (!fs.existsSync(dest)) {
+      fs.renameSync(file.path, dest);
+      deduped = false;
+    } else {
+      fs.unlinkSync(file.path); // identical bytes already stored — drop the temp
+    }
+
+    // Best-effort: register with ComfyUI under the same stable name so it can be
+    // used as a workflow input. If ComfyUI is offline we still return the path.
+    let comfyName = name;
+    try {
+      const mime = ext.match(/jpe?g/i) ? 'image/jpeg' : ext.match(/webp/i) ? 'image/webp' : 'image/png';
+      const result = await uploadImageToComfy(config.comfyUrl, name, fs.readFileSync(dest), mime);
+      comfyName = result.name || name;
+    } catch (e) {
+      console.warn('Reference ComfyUI upload skipped:', e.message || e.code || e);
+    }
+
+    res.json({
+      path: `/references/${name}`,
+      filename: name,
+      comfyName,
+      originalName: file.originalname,
+      deduped,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

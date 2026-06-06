@@ -27,6 +27,18 @@ export interface ImageNodeData {
   [key: string]: unknown;
 }
 
+/**
+ * Reference image (PureRef-style moodboard material). Shares the Image node's
+ * shape so it resolves as an `image` source in workflows, plus non-destructive
+ * display controls. `display` is color | grayscale | luminance; `opacity` 0–1;
+ * `crop` is a normalized rect (0–1) applied visually (Phase 3).
+ */
+export interface ReferenceNodeData extends ImageNodeData {
+  display?: 'color' | 'grayscale' | 'luminance';
+  opacity?: number;
+  crop?: { x: number; y: number; w: number; h: number } | null;
+}
+
 /** A typed input slot declared by a workflow template's config.json. */
 export interface TemplateInput {
   name: string;

@@ -15,6 +15,7 @@ import { TemplateNode } from './TemplateNode';
 import { GridJoinNode } from './GridJoinNode';
 import { GridSplitNode } from './GridSplitNode';
 import { NetBoxNode } from './NetBoxNode';
+import { ReferenceNode } from './ReferenceNode';
 
 /**
  * Registry of migrated node types. Types not listed here (tile-preview,
@@ -39,4 +40,5 @@ export const nodeTypes: NodeTypes = {
   gridjoin: GridJoinNode,
   gridsplit: GridSplitNode,
   netbox: NetBoxNode,
+  reference: ReferenceNode,
 };

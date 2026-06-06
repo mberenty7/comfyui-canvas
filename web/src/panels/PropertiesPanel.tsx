@@ -22,6 +22,7 @@ import type {
   OverlayNodeData,
   PaintNodeData,
   PromptNodeData,
+  ReferenceNodeData,
   TemplateNodeData,
   TemplateParam,
   ViewerNodeData,
@@ -105,10 +106,11 @@ export function PropertiesPanel() {
         {node.type === 'paint' && <PaintProperties id={node.id} data={node.data as PaintNodeData} onChange={updateNodeData} />}
         {node.type === 'group' && <GroupProperties id={node.id} label={(node.data.label as string) || 'Group'} onChange={updateNodeData} />}
         {node.type === 'netbox' && <NetBoxProperties id={node.id} data={node.data as { label?: string; color?: string }} onChange={updateNodeData} />}
+        {node.type === 'reference' && <ReferenceProperties id={node.id} data={node.data as ReferenceNodeData} onChange={updateNodeData} />}
         {node.type === 'template' && <TemplateProperties id={node.id} data={node.data as TemplateNodeData} onChange={updateNodeData} />}
         {node.type === 'gridjoin' && <GridJoinProperties id={node.id} data={node.data as GridJoinNodeData} onChange={updateNodeData} />}
         {node.type === 'gridsplit' && <GridSplitProperties id={node.id} data={node.data as GridSplitNodeData} onChange={updateNodeData} />}
-        {!['prompt', 'image', 'workflow', 'generate', 'model', 'viewer', 'inpaint', 'colorpick', 'overlay', 'grade', 'paint', 'group', 'template', 'gridjoin', 'gridsplit', 'netbox'].includes(node.type ?? '') && (
+        {!['prompt', 'image', 'workflow', 'generate', 'model', 'viewer', 'inpaint', 'colorpick', 'overlay', 'grade', 'paint', 'group', 'template', 'gridjoin', 'gridsplit', 'netbox', 'reference'].includes(node.type ?? '') && (
           <div className="prop-section">
             <label className="prop-section-label">Type</label>
             <div className="prop-value">{node.type}</div>
@@ -1186,6 +1188,27 @@ function GridSplitProperties({
 }
 
 const BOX_COLORS = ['#4a9eff', '#a855f7', '#4caf50', '#e94560', '#f5a623', '#888'];
+
+function ReferenceProperties({
+  data,
+}: {
+  id: string;
+  data: ReferenceNodeData;
+  onChange: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  return (
+    <>
+      <div className="prop-section">
+        <label className="prop-section-label">Reference</label>
+        <PropRow label="File" value={data.filename || '—'} />
+        {data.width && data.height ? <PropRow label="Size" value={`${data.width} × ${data.height}`} /> : null}
+        {data.format ? <PropRow label="Format" value={data.format} /> : null}
+        <PropRow label="Stored" value={data.imageUrl?.startsWith('/references/') ? 'references/ (deduped)' : 'in place'} />
+      </div>
+      <p style={{ fontSize: 11, color: '#666' }}>Connect the output to a Workflow or Inpaint to use it as an image input. Display controls (grayscale / luminance / opacity / crop) arrive next.</p>
+    </>
+  );
+}
 
 function NetBoxProperties({
   id,

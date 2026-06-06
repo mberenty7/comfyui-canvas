@@ -97,6 +97,14 @@ body,
   background: #f5a623;
 }
 
+/* ── Reference node ──────────────────────────── */
+.cv-node-reference.selected {
+  box-shadow: 0 0 0 2px #f5a623;
+}
+.cv-reference-tag {
+  color: #f5a623 !important;
+}
+
 /* ── Network box ─────────────────────────────── */
 .cv-netbox {
   border: 2px solid #4a9eff;

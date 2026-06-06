@@ -37,6 +37,7 @@ export function sourceProvides(node: Node): PortType[] {
     case 'prompt':
       return ['prompt'];
     case 'image':
+    case 'reference':
       return ['image'];
     case 'workflow':
       return ['workflow'];

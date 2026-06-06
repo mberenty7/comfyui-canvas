@@ -1,5 +1,6 @@
 node_modules/
 uploads/
+references/
 canvases/
 /config.json
 public/dist/

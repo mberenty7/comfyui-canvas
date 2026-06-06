@@ -5,7 +5,7 @@ import { apiUpload } from './api';
 export type NodeKind =
   | 'prompt' | 'image' | 'workflow' | 'generate' | 'model' | 'viewer'
   | 'inpaint' | 'colorpick' | 'overlay' | 'grade' | 'paint' | 'group'
-  | 'template' | 'gridjoin' | 'gridsplit' | 'netbox';
+  | 'template' | 'gridjoin' | 'gridsplit' | 'netbox' | 'reference';
 
 export interface NodeKindDef {
   type: NodeKind;
@@ -18,6 +18,7 @@ export const NODE_KINDS: NodeKindDef[] = [
   { type: 'prompt', label: '✏️ Prompt', category: 'Inputs' },
   { type: 'template', label: '🔤 Template', category: 'Inputs' },
   { type: 'image', label: '📷 Image', category: 'Inputs' },
+  { type: 'reference', label: '📌 Reference', category: 'Inputs' },
   { type: 'workflow', label: '⚙️ Workflow', category: 'Generate' },
   { type: 'generate', label: '▶ Generate', category: 'Generate' },
   { type: 'inpaint', label: '🎨 Inpaint', category: 'Image AI' },
@@ -97,6 +98,42 @@ export async function uploadImageFile(file: File, pos: Pos) {
   }
 }
 
+/**
+ * Copy an image into the reference repository (content-hash dedup, server-side)
+ * and place a connectable Reference node at the given flow position. Used by the
+ * Reference picker, clipboard paste, and drag-drop of reference material.
+ */
+export async function uploadReferenceFile(file: File, pos: Pos): Promise<string | undefined> {
+  const form = new FormData();
+  form.append('image', file);
+  const result = await apiUpload<{ path?: string; filename?: string; comfyName?: string; originalName?: string; error?: string }>(
+    '/api/references',
+    form,
+  );
+  if (!result.path) {
+    alert('Reference upload failed: ' + (result.error || 'unknown'));
+    return;
+  }
+  const dims = await imageDimensions(result.path);
+  return useCanvasStore.getState().addNode(
+    'reference',
+    {
+      label: '',
+      imageUrl: result.path,
+      filename: result.originalName || file.name,
+      comfyName: result.comfyName || result.filename,
+      width: dims.width,
+      height: dims.height,
+      fileSize: file.size,
+      format: file.type.split('/')[1]?.toUpperCase() || '?',
+      display: 'color',
+      opacity: 1,
+      crop: null,
+    },
+    { x: pos.x - 90, y: pos.y - 90 },
+  );
+}
+
 /** Upload a 3D model file and place a Model node at the given flow position. */
 export async function uploadModelFile(file: File, pos: Pos) {
   const form = new FormData();
@@ -146,6 +183,9 @@ export function createNodeAt(type: NodeKind, pos: Pos) {
       break;
     case 'image':
       pickFile('image/*', (file) => uploadImageFile(file, pos));
+      break;
+    case 'reference':
+      pickFile('image/*', (file) => uploadReferenceFile(file, pos));
       break;
     case 'model':
       pickFile('.glb,.gltf,.obj,.fbx', (file) => uploadModelFile(file, pos));

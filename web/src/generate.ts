@@ -115,7 +115,7 @@ function buildMetadata(wfData: WorkflowNodeData, connectedInputs: Record<string,
     if (src?.type === 'prompt') {
       meta.positive = sd.positive || '';
       meta.negative = sd.negative || '';
-    } else if (src?.type === 'image') {
+    } else if (src?.type === 'image' || src?.type === 'reference') {
       meta[inputName + '_image'] = sd.filename || sd.comfyName || '';
     }
   }

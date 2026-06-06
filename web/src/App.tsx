@@ -30,7 +30,7 @@ import { Breadcrumb } from './panels/Breadcrumb';
 import { useViewer3D } from './viewer3d';
 import { isValidConnection as checkConnection, MODEL_HANDLE } from './ports';
 import type { ModelNodeData } from './types';
-import { uploadImageFile, uploadModelFile } from './nodeActions';
+import { uploadImageFile, uploadModelFile, uploadReferenceFile } from './nodeActions';
 import type { CanvasFileV2 } from './types';
 
 const AUTOSAVE_KEY = 'comfyui-canvas-autosave';
@@ -132,6 +132,26 @@ function Canvas() {
     const t = setTimeout(() => rf.fitView({ duration: 200, maxZoom: 1.2 }), 30);
     return () => clearTimeout(t);
   }, [currentGroup, rf]);
+
+  // Clipboard paste (Ctrl/Cmd+V) → drop an image from the clipboard onto the
+  // canvas as a Reference, at the centre of the current view. Ignored while
+  // typing in an input/textarea so normal text paste still works.
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      const items = Array.from(e.clipboardData?.items ?? []);
+      const imgItem = items.find((it) => it.type.startsWith('image/'));
+      if (!imgItem) return;
+      const file = imgItem.getAsFile();
+      if (!file) return;
+      e.preventDefault();
+      const center = rf.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+      uploadReferenceFile(file, center);
+    }
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [rf]);
 
   function onSelectionChange({ nodes: selectedNodes }: OnSelectionChangeParams) {
     setSelected(selectedNodes[0]?.id ?? null);
@@ -297,6 +317,15 @@ function Canvas() {
 export function App() {
   return (
     <ReactFlowProvider>
+      {/* Rec.709 luminance filter for Reference nodes' perceptual-grayscale mode. */}
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden>
+        <filter id="cv-luminance" colorInterpolationFilters="sRGB">
+          <feColorMatrix
+            type="matrix"
+            values="0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0 0 0 1 0"
+          />
+        </filter>
+      </svg>
       <Canvas />
     </ReactFlowProvider>
   );
