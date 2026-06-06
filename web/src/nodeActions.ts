@@ -5,7 +5,7 @@ import { apiUpload } from './api';
 export type NodeKind =
   | 'prompt' | 'image' | 'workflow' | 'generate' | 'model' | 'viewer'
   | 'inpaint' | 'colorpick' | 'overlay' | 'grade' | 'paint' | 'group'
-  | 'template' | 'gridjoin' | 'gridsplit' | 'netbox' | 'reference';
+  | 'template' | 'gridjoin' | 'gridsplit' | 'netbox' | 'reference' | 'note';
 
 export interface NodeKindDef {
   type: NodeKind;
@@ -31,6 +31,7 @@ export const NODE_KINDS: NodeKindDef[] = [
   { type: 'gridjoin', label: '🔳 Grid Join', category: 'Utility' },
   { type: 'gridsplit', label: '✂️ Grid Split', category: 'Utility' },
   { type: 'netbox', label: '🗂 Network Box', category: 'Utility' },
+  { type: 'note', label: '📝 Sticky Note', category: 'Utility' },
   { type: 'group', label: '📦 Group', category: 'Utility' },
 ];
 
@@ -217,6 +218,9 @@ export function createNodeAt(type: NodeKind, pos: Pos) {
       break;
     case 'netbox':
       store.addNode('netbox', { label: 'Box', color: '#4a9eff', width: 340, height: 240 }, { x: pos.x - 170, y: pos.y - 120 });
+      break;
+    case 'note':
+      store.addNode('note', { text: '', color: '#ffe066', viewW: 200, viewH: 140 }, { x: pos.x - 100, y: pos.y - 70 });
       break;
     case 'template':
       store.addNode('template', { label: '', template: 'A <style> photo of <subject>', tagDefaults: {} }, { x: pos.x - 90, y: pos.y - 30 });

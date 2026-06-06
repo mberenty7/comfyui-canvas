@@ -48,6 +48,8 @@ interface CanvasState {
   disconnectInput: (targetId: string, handle: string) => void;
   /** Shift the given nodes by a delta (used for network-box sticky containment). */
   moveNodesBy: (ids: string[], dx: number, dy: number) => void;
+  /** Set absolute positions for the given nodes (used by network-box auto-arrange). */
+  setNodePositions: (positions: Record<string, { x: number; y: number }>) => void;
   addResultEdge: (source: string, target: string) => void;
   setGenStatus: (id: string, status: GenStatus) => void;
 
@@ -183,6 +185,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       nodes: get().nodes.map((n) =>
         set2.has(n.id) ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } } : n,
       ),
+    });
+  },
+
+  setNodePositions: (positions) => {
+    set({
+      nodes: get().nodes.map((n) => (positions[n.id] ? { ...n, position: positions[n.id] } : n)),
     });
   },
 

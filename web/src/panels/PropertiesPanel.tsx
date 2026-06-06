@@ -10,7 +10,7 @@ import { resolveImageUrl, loadImage, processColorPick, processOverlay, processGr
 import { templateTags, resolvePromptText, TAG_RE } from '../promptResolve';
 import { runGridSplit } from '../gridSplit';
 import { usePaintEditor } from '../paintEditor';
-import { toggleNetBoxCollapsed } from '../nodes/NetBoxNode';
+import { toggleNetBoxCollapsed, arrangeNetBox } from '../nodes/NetBoxNode';
 import type {
   ColorPickNodeData,
   GenerateNodeData,
@@ -20,6 +20,7 @@ import type {
   ImageNodeData,
   InpaintNodeData,
   ModelNodeData,
+  NoteNodeData,
   OverlayNodeData,
   PaintNodeData,
   PromptNodeData,
@@ -108,10 +109,11 @@ export function PropertiesPanel() {
         {node.type === 'group' && <GroupProperties id={node.id} label={(node.data.label as string) || 'Group'} onChange={updateNodeData} />}
         {node.type === 'netbox' && <NetBoxProperties id={node.id} data={node.data as { label?: string; color?: string }} onChange={updateNodeData} />}
         {node.type === 'reference' && <ReferenceProperties id={node.id} data={node.data as ReferenceNodeData} onChange={updateNodeData} />}
+        {node.type === 'note' && <NoteProperties id={node.id} data={node.data as NoteNodeData} onChange={updateNodeData} />}
         {node.type === 'template' && <TemplateProperties id={node.id} data={node.data as TemplateNodeData} onChange={updateNodeData} />}
         {node.type === 'gridjoin' && <GridJoinProperties id={node.id} data={node.data as GridJoinNodeData} onChange={updateNodeData} />}
         {node.type === 'gridsplit' && <GridSplitProperties id={node.id} data={node.data as GridSplitNodeData} onChange={updateNodeData} />}
-        {!['prompt', 'image', 'workflow', 'generate', 'model', 'viewer', 'inpaint', 'colorpick', 'overlay', 'grade', 'paint', 'group', 'template', 'gridjoin', 'gridsplit', 'netbox', 'reference'].includes(node.type ?? '') && (
+        {!['prompt', 'image', 'workflow', 'generate', 'model', 'viewer', 'inpaint', 'colorpick', 'overlay', 'grade', 'paint', 'group', 'template', 'gridjoin', 'gridsplit', 'netbox', 'reference', 'note'].includes(node.type ?? '') && (
           <div className="prop-section">
             <label className="prop-section-label">Type</label>
             <div className="prop-value">{node.type}</div>
@@ -1188,6 +1190,36 @@ function GridSplitProperties({
   );
 }
 
+const NOTE_COLORS = ['#ffe066', '#ffd1a1', '#b9f6ca', '#a1c9ff', '#ffb1c8', '#e0e0e0'];
+
+function NoteProperties({
+  id,
+  data,
+  onChange,
+}: {
+  id: string;
+  data: NoteNodeData;
+  onChange: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  return (
+    <>
+      <div className="prop-section">
+        <label className="prop-section-label">Text</label>
+        <textarea className="prop-input" rows={4} value={data.text ?? ''} placeholder="Note…" onChange={(e) => onChange(id, { text: e.target.value })} />
+      </div>
+      <div className="prop-section">
+        <label className="prop-section-label">Color</label>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {NOTE_COLORS.map((c) => (
+            <button key={c} className="cv-swatch" style={{ background: c, outline: data.color === c ? '2px solid #fff' : 'none' }} onClick={() => onChange(id, { color: c })} />
+          ))}
+        </div>
+      </div>
+      <p style={{ fontSize: 11, color: '#666' }}>Type directly on the note, or drag its top bar to move it. Drop it inside a Network Box to keep it with the board.</p>
+    </>
+  );
+}
+
 const BOX_COLORS = ['#4a9eff', '#a855f7', '#4caf50', '#e94560', '#f5a623', '#888'];
 
 function ReferenceProperties({
@@ -1269,8 +1301,9 @@ function NetBoxProperties({
         <label className="prop-section-label">Title</label>
         <input type="text" className="prop-input" value={data.label ?? ''} placeholder="e.g. Hero refs" onChange={(e) => onChange(id, { label: e.target.value })} />
       </div>
-      <div className="prop-section">
-        <button className="prop-btn" onClick={() => toggleNetBoxCollapsed(id)}>{data.collapsed ? 'Expand box' : 'Minimize box'}</button>
+      <div className="prop-section" style={{ display: 'flex', gap: 6 }}>
+        <button className="prop-btn" onClick={() => arrangeNetBox(id)}>Arrange contents</button>
+        <button className="prop-btn" onClick={() => toggleNetBoxCollapsed(id)}>{data.collapsed ? 'Expand' : 'Minimize'}</button>
       </div>
       <div className="prop-section">
         <label className="prop-section-label">Color</label>

@@ -42,6 +42,15 @@ export interface ReferenceNodeData extends ImageNodeData {
   viewH?: number;
 }
 
+/** A sticky note — freeform text label on the canvas (no ports). */
+export interface NoteNodeData {
+  text?: string;
+  color?: string;
+  viewW?: number;
+  viewH?: number;
+  [key: string]: unknown;
+}
+
 /** A typed input slot declared by a workflow template's config.json. */
 export interface TemplateInput {
   name: string;
