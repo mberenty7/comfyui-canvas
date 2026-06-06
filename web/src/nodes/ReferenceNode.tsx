@@ -15,9 +15,9 @@ export function ReferenceNode({ id, data, selected }: NodeProps) {
   const opacity = d.opacity ?? 1;
   const w = d.viewW ?? 200;
   const h = d.viewH ?? 200;
-  // grayscale = simple desaturation; luminance = Rec.709 perceptual weighting.
+  // grayscale = equal-weight average; luminance = Rec.709 perceptual weighting.
   const filter =
-    display === 'grayscale' ? 'grayscale(1)' : display === 'luminance' ? 'url(#cv-luminance)' : undefined;
+    display === 'grayscale' ? 'url(#cv-grayscale)' : display === 'luminance' ? 'url(#cv-luminance)' : undefined;
 
   // Conform the box to the image's true aspect ratio (no letterbox / dead space).
   // Runs once per image once its natural size is known; also backfills width/height.

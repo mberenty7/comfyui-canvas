@@ -10,6 +10,7 @@ import { resolveImageUrl, loadImage, processColorPick, processOverlay, processGr
 import { templateTags, resolvePromptText, TAG_RE } from '../promptResolve';
 import { runGridSplit } from '../gridSplit';
 import { usePaintEditor } from '../paintEditor';
+import { toggleNetBoxCollapsed } from '../nodes/NetBoxNode';
 import type {
   ColorPickNodeData,
   GenerateNodeData,
@@ -1199,7 +1200,7 @@ function ReferenceProperties({
   onChange: (id: string, patch: Record<string, unknown>) => void;
 }) {
   const display = data.display ?? 'color';
-  const filter = display === 'grayscale' ? 'grayscale(1)' : display === 'luminance' ? 'url(#cv-luminance)' : undefined;
+  const filter = display === 'grayscale' ? 'url(#cv-grayscale)' : display === 'luminance' ? 'url(#cv-luminance)' : undefined;
   const kb = data.fileSize ? `${Math.round(data.fileSize / 1024).toLocaleString()} KB` : null;
   return (
     <>
@@ -1259,7 +1260,7 @@ function NetBoxProperties({
   onChange,
 }: {
   id: string;
-  data: { label?: string; color?: string };
+  data: { label?: string; color?: string; collapsed?: boolean };
   onChange: (id: string, patch: Record<string, unknown>) => void;
 }) {
   return (
@@ -1267,6 +1268,9 @@ function NetBoxProperties({
       <div className="prop-section">
         <label className="prop-section-label">Title</label>
         <input type="text" className="prop-input" value={data.label ?? ''} placeholder="e.g. Hero refs" onChange={(e) => onChange(id, { label: e.target.value })} />
+      </div>
+      <div className="prop-section">
+        <button className="prop-btn" onClick={() => toggleNetBoxCollapsed(id)}>{data.collapsed ? 'Expand box' : 'Minimize box'}</button>
       </div>
       <div className="prop-section">
         <label className="prop-section-label">Color</label>

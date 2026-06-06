@@ -40,16 +40,30 @@ function Canvas() {
   const allNodes = useCanvasStore((s) => s.nodes);
   const allEdges = useCanvasStore((s) => s.edges);
   const currentGroup = useCanvasStore((s) => s.currentGroup);
-  // Only show the nodes/edges that belong to the group currently being viewed.
-  // Network boxes render behind everything else (zIndex −1).
+  // Nodes hidden because they live inside a collapsed (minimized) Network Box.
+  const hiddenByBox = useMemo(() => {
+    const set = new Set<string>();
+    for (const n of allNodes) {
+      if (n.type === 'netbox' && (n.data as { collapsed?: boolean }).collapsed) {
+        for (const id of ((n.data as { contained?: string[] }).contained ?? [])) set.add(id);
+      }
+    }
+    return set;
+  }, [allNodes]);
+
+  // Only show the nodes/edges that belong to the group currently being viewed,
+  // minus anything hidden inside a collapsed box. Boxes render behind (zIndex −1).
   const nodes = useMemo(
     () =>
       allNodes
-        .filter((n) => ((n.data?.group as string) || 'root') === currentGroup)
+        .filter((n) => ((n.data?.group as string) || 'root') === currentGroup && !hiddenByBox.has(n.id))
         .map((n) => (n.type === 'netbox' ? { ...n, zIndex: -1 } : n)),
-    [allNodes, currentGroup],
+    [allNodes, currentGroup, hiddenByBox],
   );
-  const edges = useMemo(() => allEdges.filter((e) => ((e.data?.group as string) || 'root') === currentGroup), [allEdges, currentGroup]);
+  const edges = useMemo(
+    () => allEdges.filter((e) => ((e.data?.group as string) || 'root') === currentGroup && !hiddenByBox.has(e.source) && !hiddenByBox.has(e.target)),
+    [allEdges, currentGroup, hiddenByBox],
+  );
   const onNodesChange = useCanvasStore((s) => s.onNodesChange);
   const onEdgesChange = useCanvasStore((s) => s.onEdgesChange);
   const onConnect = useCanvasStore((s) => s.onConnect);
@@ -320,8 +334,16 @@ function Canvas() {
 export function App() {
   return (
     <ReactFlowProvider>
-      {/* Rec.709 luminance filter for Reference nodes' perceptual-grayscale mode. */}
+      {/* Reference display filters: grayscale = equal-weight average; luminance =
+          Rec.709 perceptual weighting. (CSS grayscale() already uses Rec.709, so
+          we roll our own average to keep the two modes visibly distinct.) */}
       <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden>
+        <filter id="cv-grayscale" colorInterpolationFilters="sRGB">
+          <feColorMatrix
+            type="matrix"
+            values="0.3333 0.3333 0.3333 0 0  0.3333 0.3333 0.3333 0 0  0.3333 0.3333 0.3333 0 0  0 0 0 1 0"
+          />
+        </filter>
         <filter id="cv-luminance" colorInterpolationFilters="sRGB">
           <feColorMatrix
             type="matrix"
