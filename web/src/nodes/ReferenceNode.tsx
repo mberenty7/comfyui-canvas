@@ -18,6 +18,22 @@ export function ReferenceNode({ id, data, selected }: NodeProps) {
   // grayscale = simple desaturation; luminance = Rec.709 perceptual weighting.
   const filter =
     display === 'grayscale' ? 'grayscale(1)' : display === 'luminance' ? 'url(#cv-luminance)' : undefined;
+
+  // Conform the box to the image's true aspect ratio (no letterbox / dead space).
+  // Runs once per image once its natural size is known; also backfills width/height.
+  function onImgLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+    const img = e.currentTarget;
+    if (!img.naturalWidth || !img.naturalHeight) return;
+    const aspect = img.naturalWidth / img.naturalHeight;
+    const patch: Record<string, unknown> = {};
+    if (!d.width || !d.height) {
+      patch.width = img.naturalWidth;
+      patch.height = img.naturalHeight;
+    }
+    if (Math.abs(w / h - aspect) > 0.01) patch.viewH = Math.round(w / aspect);
+    if (Object.keys(patch).length) useCanvasStore.getState().updateNodeData(id, patch);
+  }
+
   return (
     <>
       <NodeResizer
@@ -30,7 +46,7 @@ export function ReferenceNode({ id, data, selected }: NodeProps) {
       />
       <div className={`cv-node cv-node-reference${selected ? ' selected' : ''}`} style={{ width: w, height: h }}>
         {d.imageUrl ? (
-          <img className="cv-reference-img" src={d.imageUrl} alt={d.filename || ''} draggable={false} style={{ filter, opacity }} />
+          <img className="cv-reference-img" src={d.imageUrl} alt={d.filename || ''} draggable={false} style={{ filter, opacity }} onLoad={onImgLoad} />
         ) : (
           <div className="cv-node-thumb-empty" style={{ height: '100%' }}>no image</div>
         )}

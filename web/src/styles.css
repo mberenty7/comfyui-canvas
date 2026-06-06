@@ -97,6 +97,35 @@ body,
   background: #f5a623;
 }
 
+/* ── Segmented control (properties) ──────────── */
+.cv-seg {
+  display: flex;
+  gap: 2px;
+  background: #15152b;
+  border: 1px solid #2a2a44;
+  border-radius: 5px;
+  padding: 2px;
+}
+.cv-seg-btn {
+  flex: 1;
+  font-size: 11px;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: #aaa;
+  cursor: pointer;
+}
+.cv-seg-btn:hover {
+  background: #20203a;
+  color: #ddd;
+}
+.cv-seg-btn.active {
+  background: #f5a623;
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
 /* ── Reference node ──────────────────────────── */
 .cv-node-reference {
   position: relative;

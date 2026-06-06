@@ -1222,6 +1222,23 @@ function ReferenceProperties({
         <input type="text" className="prop-input" value={data.label ?? ''} placeholder="e.g. hero pose" onChange={(e) => onChange(id, { label: e.target.value })} />
       </div>
       <div className="prop-section">
+        <label className="prop-section-label">Display</label>
+        <div className="cv-seg">
+          {(['color', 'grayscale', 'luminance'] as const).map((mode) => (
+            <button key={mode} className={`cv-seg-btn${display === mode ? ' active' : ''}`} onClick={() => onChange(id, { display: mode })}>
+              {mode === 'color' ? 'Color' : mode === 'grayscale' ? 'Grayscale' : 'Luminance'}
+            </button>
+          ))}
+        </div>
+        <p style={{ fontSize: 10, color: '#666', margin: '4px 0 0' }}>
+          {display === 'luminance' ? 'Rec.709 perceptual value (for value studies).' : display === 'grayscale' ? 'Flat desaturation.' : 'Full color.'} Display only — the source image is unchanged.
+        </p>
+      </div>
+      <div className="prop-section">
+        <label className="prop-section-label">Opacity — {Math.round((data.opacity ?? 1) * 100)}%</label>
+        <input type="range" style={{ width: '100%' }} min={10} max={100} value={Math.round((data.opacity ?? 1) * 100)} onChange={(e) => onChange(id, { opacity: Number(e.target.value) / 100 })} />
+      </div>
+      <div className="prop-section">
         <label className="prop-section-label">Info</label>
         <PropRow label="File" value={data.filename || '—'} />
         {data.width && data.height ? <PropRow label="Dimensions" value={`${data.width} × ${data.height}`} /> : null}
@@ -1231,7 +1248,7 @@ function ReferenceProperties({
         <PropRow label="Stored" value={data.imageUrl?.startsWith('/references/') ? 'references/ (deduped)' : 'in place'} />
         {data.comfyName ? <PropRow label="ComfyUI" value={data.comfyName} /> : null}
       </div>
-      <p style={{ fontSize: 11, color: '#666' }}>Resize on the canvas by dragging a corner. Connect the output to a Workflow or Inpaint to use it as an image input. Display controls (grayscale / luminance / opacity / crop) arrive next.</p>
+      <p style={{ fontSize: 11, color: '#666' }}>Resize on the canvas by dragging a corner. Connect the output to a Workflow or Inpaint to use it as an image input. Crop arrives next.</p>
     </>
   );
 }
