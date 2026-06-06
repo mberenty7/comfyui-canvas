@@ -41,7 +41,14 @@ function Canvas() {
   const allEdges = useCanvasStore((s) => s.edges);
   const currentGroup = useCanvasStore((s) => s.currentGroup);
   // Only show the nodes/edges that belong to the group currently being viewed.
-  const nodes = useMemo(() => allNodes.filter((n) => ((n.data?.group as string) || 'root') === currentGroup), [allNodes, currentGroup]);
+  // Network boxes render behind everything else (zIndex −1).
+  const nodes = useMemo(
+    () =>
+      allNodes
+        .filter((n) => ((n.data?.group as string) || 'root') === currentGroup)
+        .map((n) => (n.type === 'netbox' ? { ...n, zIndex: -1 } : n)),
+    [allNodes, currentGroup],
+  );
   const edges = useMemo(() => allEdges.filter((e) => ((e.data?.group as string) || 'root') === currentGroup), [allEdges, currentGroup]);
   const onNodesChange = useCanvasStore((s) => s.onNodesChange);
   const onEdgesChange = useCanvasStore((s) => s.onEdgesChange);
@@ -139,6 +146,48 @@ function Canvas() {
     useUI.getState().openContextMenu({ x: e.clientX, y: e.clientY, nodeId: node.id });
   }
 
+  // Network box sticky containment: dragging a box moves the nodes inside it.
+  const boxDrag = useRef<{ boxId: string; last: { x: number; y: number }; captured: string[] } | null>(null);
+
+  function nodeCenter(n: RFNode) {
+    const w = n.measured?.width ?? 90;
+    const h = n.measured?.height ?? 60;
+    return { x: n.position.x + w / 2, y: n.position.y + h / 2 };
+  }
+
+  function onNodeDragStart(_: MouseEvent | TouchEvent, node: RFNode) {
+    if (node.type !== 'netbox') return;
+    const d = node.data as { width?: number; height?: number };
+    const x0 = node.position.x;
+    const y0 = node.position.y;
+    const x1 = x0 + (d.width || 340);
+    const y1 = y0 + (d.height || 240);
+    const captured = useCanvasStore
+      .getState()
+      .nodes.filter((n) => n.id !== node.id && n.type !== 'netbox' && ((n.data?.group as string) || 'root') === currentGroup)
+      .filter((n) => {
+        const c = nodeCenter(n);
+        return c.x >= x0 && c.x <= x1 && c.y >= y0 && c.y <= y1;
+      })
+      .map((n) => n.id);
+    boxDrag.current = { boxId: node.id, last: { x: node.position.x, y: node.position.y }, captured };
+  }
+
+  function onNodeDrag(_: MouseEvent | TouchEvent, node: RFNode) {
+    const d = boxDrag.current;
+    if (!d || d.boxId !== node.id) return;
+    const dx = node.position.x - d.last.x;
+    const dy = node.position.y - d.last.y;
+    if (dx || dy) {
+      useCanvasStore.getState().moveNodesBy(d.captured, dx, dy);
+      d.last = { x: node.position.x, y: node.position.y };
+    }
+  }
+
+  function onNodeDragStop() {
+    boxDrag.current = null;
+  }
+
   function onNodeDoubleClick(_: React.MouseEvent, node: RFNode) {
     if (node.type === 'group') {
       useCanvasStore.getState().enterGroup(node.id, (node.data.label as string) || 'Group');
@@ -197,6 +246,9 @@ function Canvas() {
         onSelectionChange={onSelectionChange}
         onMoveEnd={onMoveEnd}
         onNodeContextMenu={onNodeContextMenu}
+        onNodeDragStart={onNodeDragStart}
+        onNodeDrag={onNodeDrag}
+        onNodeDragStop={onNodeDragStop}
         onNodeDoubleClick={onNodeDoubleClick}
         onPaneContextMenu={(e) => {
           e.preventDefault();

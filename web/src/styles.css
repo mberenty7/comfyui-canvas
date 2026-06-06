@@ -97,6 +97,24 @@ body,
   background: #f5a623;
 }
 
+/* ── Network box ─────────────────────────────── */
+.cv-netbox {
+  border: 2px solid #4a9eff;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+.cv-netbox.selected {
+  border-style: solid;
+  filter: brightness(1.15);
+}
+.cv-netbox-title {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px 0 6px 0;
+}
+
 /* ── Template node + preview ─────────────────── */
 .cv-node-template {
   border-color: #f5a623;

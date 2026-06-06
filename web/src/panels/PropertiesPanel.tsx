@@ -104,10 +104,11 @@ export function PropertiesPanel() {
         {node.type === 'grade' && <GradeProperties id={node.id} data={node.data as GradeNodeData} onChange={updateNodeData} />}
         {node.type === 'paint' && <PaintProperties id={node.id} data={node.data as PaintNodeData} onChange={updateNodeData} />}
         {node.type === 'group' && <GroupProperties id={node.id} label={(node.data.label as string) || 'Group'} onChange={updateNodeData} />}
+        {node.type === 'netbox' && <NetBoxProperties id={node.id} data={node.data as { label?: string; color?: string }} onChange={updateNodeData} />}
         {node.type === 'template' && <TemplateProperties id={node.id} data={node.data as TemplateNodeData} onChange={updateNodeData} />}
         {node.type === 'gridjoin' && <GridJoinProperties id={node.id} data={node.data as GridJoinNodeData} onChange={updateNodeData} />}
         {node.type === 'gridsplit' && <GridSplitProperties id={node.id} data={node.data as GridSplitNodeData} onChange={updateNodeData} />}
-        {!['prompt', 'image', 'workflow', 'generate', 'model', 'viewer', 'inpaint', 'colorpick', 'overlay', 'grade', 'paint', 'group', 'template', 'gridjoin', 'gridsplit'].includes(node.type ?? '') && (
+        {!['prompt', 'image', 'workflow', 'generate', 'model', 'viewer', 'inpaint', 'colorpick', 'overlay', 'grade', 'paint', 'group', 'template', 'gridjoin', 'gridsplit', 'netbox'].includes(node.type ?? '') && (
           <div className="prop-section">
             <label className="prop-section-label">Type</label>
             <div className="prop-value">{node.type}</div>
@@ -1180,6 +1181,37 @@ function GridSplitProperties({
           </div>
         </>
       )}
+    </>
+  );
+}
+
+const BOX_COLORS = ['#4a9eff', '#a855f7', '#4caf50', '#e94560', '#f5a623', '#888'];
+
+function NetBoxProperties({
+  id,
+  data,
+  onChange,
+}: {
+  id: string;
+  data: { label?: string; color?: string };
+  onChange: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  return (
+    <>
+      <div className="prop-section">
+        <label className="prop-section-label">Title</label>
+        <input type="text" className="prop-input" value={data.label ?? ''} placeholder="e.g. Hero refs" onChange={(e) => onChange(id, { label: e.target.value })} />
+      </div>
+      <div className="prop-section">
+        <label className="prop-section-label">Color</label>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {BOX_COLORS.map((c) => (
+            <button key={c} className="cv-swatch" style={{ background: c, outline: data.color === c ? '2px solid #fff' : 'none' }} onClick={() => onChange(id, { color: c })} />
+          ))}
+          <input type="color" value={data.color ?? '#4a9eff'} onChange={(e) => onChange(id, { color: e.target.value })} />
+        </div>
+      </div>
+      <p style={{ fontSize: 11, color: '#666' }}>Drag the box to move everything inside it. Drag the corner to resize. Drag a node out to detach it.</p>
     </>
   );
 }

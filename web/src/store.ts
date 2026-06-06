@@ -46,6 +46,8 @@ interface CanvasState {
   deleteNode: (id: string) => void;
   duplicateNode: (id: string) => void;
   disconnectInput: (targetId: string, handle: string) => void;
+  /** Shift the given nodes by a delta (used for network-box sticky containment). */
+  moveNodesBy: (ids: string[], dx: number, dy: number) => void;
   addResultEdge: (source: string, target: string) => void;
   setGenStatus: (id: string, status: GenStatus) => void;
 
@@ -171,6 +173,16 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   disconnectInput: (targetId, handle) => {
     set({
       edges: get().edges.filter((e) => !(e.target === targetId && e.targetHandle === handle)),
+    });
+  },
+
+  moveNodesBy: (ids, dx, dy) => {
+    if (ids.length === 0 || (dx === 0 && dy === 0)) return;
+    const set2 = new Set(ids);
+    set({
+      nodes: get().nodes.map((n) =>
+        set2.has(n.id) ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } } : n,
+      ),
     });
   },
 
